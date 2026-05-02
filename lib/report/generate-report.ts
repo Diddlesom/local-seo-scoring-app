@@ -118,6 +118,23 @@ function getStrongInternalLinks(
   return strongLinks.map(({ text, url }) => ({ text, url }));
 }
 
+function getAssistantInstructions(): string[] {
+  return [
+    "INSTRUCTIONS FOR DEVELOPER OR AI ASSISTANT",
+    "- Do not review this report generally.",
+    "- Convert each task into direct implementation instructions.",
+    "- Use only facts visible in the report or supplied by the business owner.",
+    "- Do not invent case studies, reviews, locations, services, or claims.",
+    '- If information is missing, write: "Business owner must confirm."',
+    "- Return copy-paste-ready code or content where possible.",
+    "- Keep recommendations practical for WordPress.",
+    "",
+    "CASE STUDY RULE",
+    "- Only include a case study if the business owner confirms it happened.",
+    "- Do not invent customer examples, locations, devices, problems, fixes, or turnaround times."
+  ];
+}
+
 function listItems(items: string[]): string {
   if (items.length === 0) {
     return "- None found";
@@ -312,11 +329,19 @@ function getTaskDetails(
       whereToImplement:
         "Add a short section in the main content, near service details or trust content.",
       whatToChange:
-        "Add one recent, location-specific job example.",
-      example: `Copy template:
-Recent ${location} repair example: A customer in [area] had [problem]. We [fix]. The device was returned in [timeframe].`,
+        "Only add a case study if the business owner confirms the job really happened. If any detail is missing, write: \"Business owner must confirm.\"",
+      example: `Case study confirmation fields:
+- confirmed location: Business owner must confirm.
+- device type: Business owner must confirm.
+- problem: Business owner must confirm.
+- fix completed: Business owner must confirm.
+- turnaround time: Business owner must confirm.
+- business owner confirmation required: Yes.
+
+Copy template after confirmation:
+Recent ${location} repair example: A customer in [confirmed location] had [confirmed problem] on their [confirmed device type]. We completed [confirmed fix]. The device was returned in [confirmed turnaround time].`,
       expectedOutcome:
-        "The page gains unique local proof and more specific service detail."
+        "The page gains unique local proof only when the business owner has confirmed the details are true."
     };
   }
 
@@ -398,6 +423,8 @@ export function generateDeveloperReport({
 }: GenerateReportInput): string {
   return [
     "LOCAL SEO DEVELOPER TASK SHEET",
+    "",
+    ...getAssistantInstructions(),
     "",
     "PAGE DETAILS",
     `- Target keyword: ${page.keyword || "Not provided"}`,
