@@ -15,6 +15,10 @@ export type FetchedPageData = {
   telLinks: string[];
   addressLikeText: string[];
   faqQuestions: string[];
+  faqItems: Array<{
+    question: string;
+    answer: string;
+  }>;
   relatedInternalLinks: Array<{
     text: string;
     url: string;

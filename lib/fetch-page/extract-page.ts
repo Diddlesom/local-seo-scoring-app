@@ -226,7 +226,7 @@ function getHeadingLevel(tagName: string): number {
   return Number(tagName.replace(/h/i, ""));
 }
 
-function extractFaqQuestions(html: string): string[] {
+function extractFaqSections(html: string): string[] {
   const headingPattern = /<(h[1-6])[^>]*>([\s\S]*?)<\/\1>/gi;
   const faqSections: string[] = [];
   let match = headingPattern.exec(html);
@@ -260,15 +260,92 @@ function extractFaqQuestions(html: string): string[] {
     match = headingPattern.exec(html);
   }
 
-  const faqQuestions = faqSections.flatMap((sectionHtml) =>
-    htmlToLines(sectionHtml).filter(
-      (line) => line.endsWith("?") && !isFaqHeading(line)
-    )
-  );
+  return faqSections;
+}
 
-  return Array.from(
-    new Set(faqQuestions)
-  ).slice(0, 8);
+function normalizeQuestion(question: string): string {
+  return question.toLowerCase().replace(/\s+/g, " ").trim();
+}
+
+function cleanFaqQuestion(question: string): string {
+  return cleanText(question.replace(/^(q|question)\s*[:.-]\s*/i, ""));
+}
+
+function cleanFaqAnswer(answer: string): string {
+  return cleanText(answer.replace(/^(a|answer)\s*[:.-]\s*/i, ""));
+}
+
+function isQuestionLine(line: string): boolean {
+  return line.endsWith("?") || /^(q|question)\s*[:.-]/i.test(line);
+}
+
+function isAnswerLine(line: string): boolean {
+  return /^(a|answer)\s*[:.-]/i.test(line);
+}
+
+function getQuestionAnswerFromLines(lines: string[]): FetchedPageData["faqItems"] {
+  const items: FetchedPageData["faqItems"] = [];
+
+  lines.forEach((line, index) => {
+    if (!isQuestionLine(line) || isFaqHeading(line)) {
+      return;
+    }
+
+    const answer = lines
+      .slice(index + 1)
+      .find(
+        (possibleAnswer) =>
+          !isQuestionLine(possibleAnswer) || isAnswerLine(possibleAnswer)
+      );
+
+    items.push({
+      question: cleanFaqQuestion(line),
+      answer: answer ? cleanFaqAnswer(answer) : ""
+    });
+  });
+
+  return items;
+}
+
+function getQuestionAnswerFromHtml(html: string): FetchedPageData["faqItems"] {
+  const qaPattern =
+    /<(h[2-6]|summary|dt|button)[^>]*>([\s\S]*?\?)[\s\S]*?<\/\1>\s*<(p|dd|div)[^>]*>([\s\S]*?)<\/\3>/gi;
+  const items: FetchedPageData["faqItems"] = [];
+  let match = qaPattern.exec(html);
+
+  while (match) {
+    const question = stripTags(match[2]);
+    const answer = stripTags(match[4]);
+
+    if (question.endsWith("?") && answer && !answer.endsWith("?")) {
+      items.push({ question, answer });
+    }
+
+    match = qaPattern.exec(html);
+  }
+
+  return items;
+}
+
+function extractFaqItems(html: string): FetchedPageData["faqItems"] {
+  const faqSections = extractFaqSections(html);
+  const itemsByQuestion = new Map<string, { question: string; answer: string }>();
+
+  faqSections
+    .flatMap((sectionHtml) => [
+      ...getQuestionAnswerFromHtml(sectionHtml),
+      ...getQuestionAnswerFromLines(htmlToLines(sectionHtml))
+    ])
+    .forEach((item) => {
+      const key = normalizeQuestion(item.question);
+      const existingItem = itemsByQuestion.get(key);
+
+      if (!existingItem || (!existingItem.answer && item.answer)) {
+        itemsByQuestion.set(key, item);
+      }
+    });
+
+  return Array.from(itemsByQuestion.values()).slice(0, 8);
 }
 
 function extractRelatedInternalLinks(
@@ -346,6 +423,7 @@ export function extractPageData(url: string, html: string): FetchedPageData {
   const contentHtml = pickContentHtml(html);
   const cleanTextContent = extractCleanText(contentHtml);
   const schemaScripts = extractJsonLd(html);
+  const faqItems = extractFaqItems(contentHtml);
   const headings = {
     h1: extractHeadings(contentHtml, "h1"),
     h2: extractHeadings(contentHtml, "h2"),
@@ -364,7 +442,8 @@ export function extractPageData(url: string, html: string): FetchedPageData {
     phoneNumbers: extractPhoneNumbers(cleanTextContent),
     telLinks: extractTelLinks(html),
     addressLikeText: extractAddressLikeText(cleanTextContent),
-    faqQuestions: extractFaqQuestions(contentHtml),
+    faqQuestions: faqItems.map((item) => item.question),
+    faqItems,
     relatedInternalLinks: extractRelatedInternalLinks(url, html)
   };
 }

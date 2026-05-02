@@ -7,6 +7,10 @@ export type ReportPageDetails = {
   title: string;
   metaDescription: string;
   faqQuestions: string[];
+  faqItems: Array<{
+    question: string;
+    answer: string;
+  }>;
   relatedInternalLinks: Array<{
     text: string;
     url: string;
@@ -118,6 +122,23 @@ function getStrongInternalLinks(
   return strongLinks.map(({ text, url }) => ({ text, url }));
 }
 
+function getReportFaqItems(page: ReportPageDetails): Array<{
+  question: string;
+  answer: string;
+}> {
+  const faqItems = page.faqItems.length
+    ? page.faqItems
+    : page.faqQuestions.map((question) => ({
+        question,
+        answer: ""
+      }));
+
+  return faqItems.map((item) => ({
+    question: item.question,
+    answer: item.answer || "Replace this with the exact visible answer from the page."
+  }));
+}
+
 function getAssistantInstructions(): string[] {
   return [
     "INSTRUCTIONS FOR DEVELOPER OR AI ASSISTANT",
@@ -209,10 +230,7 @@ function getTaskDetails(
       };
     }
 
-    const faqItems = page.faqQuestions.map((question) => ({
-      question,
-      answer: "Replace this with the exact visible answer from the page."
-    }));
+    const faqItems = getReportFaqItems(page);
 
     return {
       whereToImplement:

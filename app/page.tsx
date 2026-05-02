@@ -18,6 +18,10 @@ type FetchedPageData = {
   };
   schemaJson: string;
   faqQuestions: string[];
+  faqItems: Array<{
+    question: string;
+    answer: string;
+  }>;
   relatedInternalLinks: Array<{
     text: string;
     url: string;
@@ -26,6 +30,10 @@ type FetchedPageData = {
 
 type ReportDetectedData = {
   faqQuestions: string[];
+  faqItems: Array<{
+    question: string;
+    answer: string;
+  }>;
   relatedInternalLinks: Array<{
     text: string;
     url: string;
@@ -72,6 +80,7 @@ const initialFormState: FormState = {
   schemaJson: "",
   reportData: {
     faqQuestions: [],
+    faqItems: [],
     relatedInternalLinks: []
   }
 };
@@ -106,6 +115,7 @@ const exampleFormState: FormState = {
 }`,
   reportData: {
     faqQuestions: [],
+    faqItems: [],
     relatedInternalLinks: []
   }
 };
@@ -240,6 +250,7 @@ export default function Home() {
         schemaJson: pageData.schemaJson,
         reportData: {
           faqQuestions: pageData.faqQuestions ?? [],
+          faqItems: pageData.faqItems ?? [],
           relatedInternalLinks: pageData.relatedInternalLinks ?? []
         }
       }));
@@ -306,6 +317,7 @@ export default function Home() {
         title: form.title,
         metaDescription: form.metaDescription,
         faqQuestions: form.reportData.faqQuestions,
+        faqItems: form.reportData.faqItems,
         relatedInternalLinks: form.reportData.relatedInternalLinks
       },
       result
