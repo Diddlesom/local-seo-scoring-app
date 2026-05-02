@@ -24,6 +24,31 @@ const initialFormState: FormState = {
   schemaJson: ""
 };
 
+const exampleFormState: FormState = {
+  keyword: "Laptop Repair Chard",
+  location: "Chard, Somerset",
+  title: "Laptop Repair Chard | Fast Computer Repairs in Somerset",
+  metaDescription:
+    "Need Laptop Repair Chard? We provide friendly laptop and computer repairs in Chard, Somerset with clear quotes and a warranty.",
+  websiteUrl: "https://example.com/laptop-repair-chard",
+  pageContent: `<h1>Laptop Repair Chard</h1>
+<h2>Fast laptop repairs in Chard, Somerset</h2>
+<p>We help homes and small businesses with Laptop Repair Chard services, including slow laptops, broken screens, charging faults, virus removal, data recovery, and Windows setup.</p>
+<p>Our local repair service covers Chard, Somerset and nearby villages. Call us today for a clear quote or book a repair visit. We offer honest advice, friendly support, and a warranty on completed repair work.</p>
+<h2>Why choose us?</h2>
+<p>Customers choose us because we have strong reviews, over 10 years experience, and a no fix no fee approach on selected repairs.</p>
+<h3>Get help today</h3>
+<p>Contact our Chard laptop repair team on 01460 123456 to get help with your computer problem.</p>`,
+  schemaJson: `{
+  "@context": "https://schema.org",
+  "@type": "LocalBusiness",
+  "name": "Example Laptop Repair Chard",
+  "url": "https://example.com/laptop-repair-chard",
+  "telephone": "01460 123456",
+  "areaServed": "Chard, Somerset"
+}`
+};
+
 const categoryLabels: Record<keyof ScoreResult["categoryScores"], string> = {
   content: "Content",
   headings: "Headings",
@@ -59,6 +84,12 @@ export default function Home() {
       ...current,
       [field]: value
     }));
+  }
+
+  function loadExample() {
+    setForm(exampleFormState);
+    setError("");
+    setResult(null);
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -191,9 +222,14 @@ export default function Home() {
           />
         </label>
 
-        <button disabled={isLoading} type="submit">
-          {isLoading ? "Scoring..." : "Score Page"}
-        </button>
+        <div className="form-actions">
+          <button disabled={isLoading} type="submit">
+            {isLoading ? "Scoring..." : "Score Page"}
+          </button>
+          <button className="secondary-button" onClick={loadExample} type="button">
+            Load Example
+          </button>
+        </div>
 
         {error ? <p className="error">{error}</p> : null}
       </form>
