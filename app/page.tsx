@@ -386,6 +386,67 @@ function groupPriorityActions(actions: string[]): BenchmarkInsights["priorityAct
   return groups;
 }
 
+function actionFromGap(gap: string): string {
+  const cleanGap = gap.toLowerCase();
+
+  if (cleanGap.includes("content depth")) {
+    return "Increase content depth with more useful service detail and local proof.";
+  }
+
+  if (cleanGap.includes("trust") || cleanGap.includes("testimonial")) {
+    return "Improve trust signals with visible reviews, testimonials, guarantees, or named expert proof.";
+  }
+
+  if (cleanGap.includes("coverage")) {
+    return `Expand service coverage for ${gap.replace(/^Missing\s+/i, "").replace(/\s+coverage$/i, "")}.`;
+  }
+
+  if (cleanGap.includes("schema") || cleanGap.includes("subheadings")) {
+    return `Improve page structure: ${gap}.`;
+  }
+
+  return `Address competitor gap: ${gap}.`;
+}
+
+function getRelativeGap(targetValue: number, averageValue: number): number {
+  if (averageValue <= 0) {
+    return targetValue <= 0 ? 0 : -1;
+  }
+
+  return (averageValue - targetValue) / averageValue;
+}
+
+function getTopRecommendedNextStep({
+  contentGap,
+  trustGap,
+  serviceGap,
+  averageWordCount
+}: {
+  contentGap: number;
+  trustGap: number;
+  serviceGap: number;
+  averageWordCount: number;
+}): string {
+  const gaps = [
+    {
+      action: `Increase content depth toward the competitor average of ${averageWordCount} words.`,
+      gap: contentGap
+    },
+    {
+      action: "Improve trust signals with visible reviews, testimonials, guarantees, or named expert proof.",
+      gap: trustGap
+    },
+    {
+      action: "Expand service coverage for important services competitors mention but your page does not.",
+      gap: serviceGap
+    }
+  ].sort((first, second) => second.gap - first.gap);
+
+  return gaps[0].gap > 0
+    ? gaps[0].action
+    : "Review competitor-backed actions for small improvements; no single major weakness stands out.";
+}
+
 function buildBenchmarkInsights({
   competitors,
   targetResult,
@@ -460,8 +521,22 @@ function buildBenchmarkInsights({
     );
   const contentDepthComparison =
     targetResult.signals.wordCount >= averageWordCount
-      ? `Your page has ${targetResult.signals.wordCount} words versus a competitor average of ${averageWordCount}. Content depth is competitive.`
-      : `Your page has ${targetResult.signals.wordCount} words versus a competitor average of ${averageWordCount}. Add more specific service and local detail.`;
+      ? `Your page has ${targetResult.signals.wordCount} words. Competitor average is ${averageWordCount} words.`
+      : `Your page has ${targetResult.signals.wordCount} words. Competitor average is ${averageWordCount} words.`;
+  const contentGap = getRelativeGap(
+    targetResult.signals.wordCount,
+    averageWordCount
+  );
+  const trustGap = getRelativeGap(
+    targetResult.signals.trustSignals.length,
+    averageTrustSignals
+  );
+  const serviceGap = getRelativeGap(targetTopics.length, averageTopicCount);
+  const belowAverageAreas = [
+    contentGap > 0 ? "content depth" : "",
+    trustGap > 0 ? "trust signals" : "",
+    serviceGap > 0 ? "service coverage" : ""
+  ].filter(Boolean);
   const priorityActions = uniqueItems([
     ...(targetResult.signals.wordCount < averageWordCount
       ? [
@@ -471,20 +546,43 @@ function buildBenchmarkInsights({
     ...missingMajorityTopics,
     ...missingMajorityTrustSignals,
     ...missingMajoritySchemaTypes,
-    ...keyGaps
+    ...keyGaps.map(actionFromGap)
   ]).slice(0, 8);
   const priorityActionGroups = groupPriorityActions(priorityActions);
 
   return {
     overallCompetitivePosition: [
-      contentDepthComparison,
-      targetResult.signals.trustSignals.length >= averageTrustSignals
-        ? `Trust signals are competitive: your page has ${targetResult.signals.trustSignals.length}, competitor average is ${averageTrustSignals}.`
-        : `Trust signals are below average: your page has ${targetResult.signals.trustSignals.length}, competitor average is ${averageTrustSignals}.`,
-      targetTopics.length >= averageTopicCount
-        ? `Service coverage is competitive: your page covers ${targetTopics.length} detected service topics, competitor average is ${averageTopicCount}.`
-        : `Service coverage is below average: your page covers ${targetTopics.length} detected service topics, competitor average is ${averageTopicCount}.`
+      contentGap > 0
+        ? "Content depth is below the competitor average."
+        : "Content depth is competitive against the current benchmark.",
+      trustGap > 0
+        ? "Trust signals are below the competitor average."
+        : "Trust signals are competitive against the current benchmark.",
+      serviceGap > 0
+        ? "Service coverage is below the competitor average."
+        : "Service coverage is competitive against the current benchmark.",
+      belowAverageAreas.length > 0
+        ? `Summary: your page is behind competitors on ${belowAverageAreas.join(", ")}.`
+        : "Summary: your page is broadly competitive against the current competitor set."
     ],
+    overallPositionSections: {
+      contentDepth:
+        contentGap > 0
+          ? "Below competitor average."
+          : "Competitive with competitor average.",
+      trustSignals:
+        trustGap > 0
+          ? "Below competitor average."
+          : "Competitive with competitor average.",
+      serviceCoverage:
+        serviceGap > 0
+          ? "Below competitor average."
+          : "Competitive with competitor average.",
+      summary:
+        belowAverageAreas.length > 0
+          ? `Your page is behind competitors on ${belowAverageAreas.join(", ")}.`
+          : "Your page is broadly competitive against the current competitor set."
+    },
     commonPatterns: [
       ...majorityTopics.map(
         (topic) =>
@@ -533,6 +631,12 @@ function buildBenchmarkInsights({
         )
       : ["No target schema types were detected across competitors."],
     keyGaps,
+    topRecommendedNextStep: getTopRecommendedNextStep({
+      contentGap,
+      trustGap,
+      serviceGap,
+      averageWordCount
+    }),
     priorityActions,
     priorityActionGroups,
     summaryRows: competitors.map((competitor) => ({
@@ -684,10 +788,10 @@ function BenchmarkInsightsPanel({
   insights: BenchmarkInsights;
 }) {
   const actionGroups = [
-    ["Content depth", insights.priorityActionGroups.contentDepth],
-    ["Trust signals", insights.priorityActionGroups.trustSignals],
-    ["Service coverage", insights.priorityActionGroups.serviceCoverage],
-    ["Page structure", insights.priorityActionGroups.pageStructure]
+    ["Increase content depth", insights.priorityActionGroups.contentDepth],
+    ["Improve trust signals", insights.priorityActionGroups.trustSignals],
+    ["Expand service coverage", insights.priorityActionGroups.serviceCoverage],
+    ["Improve page structure", insights.priorityActionGroups.pageStructure]
   ] as const;
 
   return (
@@ -700,7 +804,24 @@ function BenchmarkInsightsPanel({
 
       <section className="insight-block">
         <h3>Overall competitive position</h3>
-        <ResultList items={insights.overallCompetitivePosition} />
+        <div className="position-list">
+          <p>
+            <strong>Content depth</strong>
+            {insights.overallPositionSections.contentDepth}
+          </p>
+          <p>
+            <strong>Trust signals</strong>
+            {insights.overallPositionSections.trustSignals}
+          </p>
+          <p>
+            <strong>Service coverage</strong>
+            {insights.overallPositionSections.serviceCoverage}
+          </p>
+          <p>
+            <strong>Summary</strong>
+            {insights.overallPositionSections.summary}
+          </p>
+        </div>
       </section>
 
       <section className="insight-block">
@@ -731,6 +852,11 @@ function BenchmarkInsightsPanel({
       <section className="insight-block highlight-block">
         <h3>Key gaps on your page</h3>
         <ResultList items={insights.keyGaps} />
+      </section>
+
+      <section className="insight-block highlight-block">
+        <h3>Top recommended next step</h3>
+        <p>{insights.topRecommendedNextStep}</p>
       </section>
 
       <section className="insight-block highlight-block">

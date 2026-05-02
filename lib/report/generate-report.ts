@@ -30,6 +30,12 @@ export type BenchmarkCompetitor = {
 
 export type BenchmarkInsights = {
   overallCompetitivePosition: string[];
+  overallPositionSections: {
+    contentDepth: string;
+    trustSignals: string;
+    serviceCoverage: string;
+    summary: string;
+  };
   commonPatterns: string[];
   majoritySignals: string[];
   contentDepthComparison: string;
@@ -37,6 +43,7 @@ export type BenchmarkInsights = {
   trustSignalPresence: string[];
   schemaUsage: string[];
   keyGaps: string[];
+  topRecommendedNextStep: string;
   priorityActions: string[];
   priorityActionGroups: {
     contentDepth: string[];
@@ -310,10 +317,10 @@ function formatBenchmark(benchmark?: BenchmarkCompetitor[]): string {
 
 function formatBenchmarkActionGroups(insights: BenchmarkInsights): string {
   const groups = [
-    ["Content depth", insights.priorityActionGroups.contentDepth],
-    ["Trust signals", insights.priorityActionGroups.trustSignals],
-    ["Service coverage", insights.priorityActionGroups.serviceCoverage],
-    ["Page structure", insights.priorityActionGroups.pageStructure]
+    ["Increase content depth", insights.priorityActionGroups.contentDepth],
+    ["Improve trust signals", insights.priorityActionGroups.trustSignals],
+    ["Expand service coverage", insights.priorityActionGroups.serviceCoverage],
+    ["Improve page structure", insights.priorityActionGroups.pageStructure]
   ] as const;
   const formattedGroups = groups
     .filter(([, actions]) => actions.length > 0)
@@ -346,10 +353,10 @@ function formatBenchmarkInsights(insights?: BenchmarkInsights | null): string {
     ),
     "",
     "Overall competitive position:",
-    listItems(
-      insights.overallCompetitivePosition,
-      "- Not enough competitor overlap to identify strong patterns yet"
-    ),
+    `- Content depth: ${cleanReportText(insights.overallPositionSections.contentDepth)}`,
+    `- Trust signals: ${cleanReportText(insights.overallPositionSections.trustSignals)}`,
+    `- Service coverage: ${cleanReportText(insights.overallPositionSections.serviceCoverage)}`,
+    `- Summary: ${cleanReportText(insights.overallPositionSections.summary)}`,
     "",
     "Majority signals:",
     listItems(
@@ -374,6 +381,9 @@ function formatBenchmarkInsights(insights?: BenchmarkInsights | null): string {
       insights.keyGaps,
       "- No consistent patterns detected across competitors yet"
     ),
+    "",
+    "Top recommended next step:",
+    `- ${cleanReportText(insights.topRecommendedNextStep)}`,
     "",
     "Priority actions based on competitors:",
     formatBenchmarkActionGroups(insights),

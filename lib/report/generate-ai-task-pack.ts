@@ -431,11 +431,10 @@ function formatBenchmarkInsightsContext(
       : ["- Not enough competitor overlap to identify strong patterns yet"]),
     "",
     "Overall competitive position:",
-    ...(insights.overallCompetitivePosition.length
-      ? insights.overallCompetitivePosition.map(
-          (position) => `- ${cleanText(position)}`
-        )
-      : ["- Not enough competitor overlap to identify strong patterns yet"]),
+    `- Content depth: ${cleanText(insights.overallPositionSections.contentDepth)}`,
+    `- Trust signals: ${cleanText(insights.overallPositionSections.trustSignals)}`,
+    `- Service coverage: ${cleanText(insights.overallPositionSections.serviceCoverage)}`,
+    `- Summary: ${cleanText(insights.overallPositionSections.summary)}`,
     "",
     "Content depth comparison:",
     `- ${cleanText(insights.contentDepthComparison)}`,
@@ -445,6 +444,9 @@ function formatBenchmarkInsightsContext(
       ? insights.keyGaps.map((gap) => `- ${cleanText(gap)}`)
       : ["- No consistent patterns detected across competitors yet"]),
     "",
+    "Top recommended next step:",
+    `- ${cleanText(insights.topRecommendedNextStep)}`,
+    "",
     "Priority actions based on competitors:",
     ...formatBenchmarkActionGroups(insights)
   ].join("\n");
@@ -452,10 +454,10 @@ function formatBenchmarkInsightsContext(
 
 function formatBenchmarkActionGroups(insights: BenchmarkInsights): string[] {
   const groups = [
-    ["Content depth", insights.priorityActionGroups.contentDepth],
-    ["Trust signals", insights.priorityActionGroups.trustSignals],
-    ["Service coverage", insights.priorityActionGroups.serviceCoverage],
-    ["Page structure", insights.priorityActionGroups.pageStructure]
+    ["Increase content depth", insights.priorityActionGroups.contentDepth],
+    ["Improve trust signals", insights.priorityActionGroups.trustSignals],
+    ["Expand service coverage", insights.priorityActionGroups.serviceCoverage],
+    ["Improve page structure", insights.priorityActionGroups.pageStructure]
   ] as const;
   const output: string[] = [];
 

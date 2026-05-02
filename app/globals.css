@@ -266,6 +266,24 @@ nav a:hover {
   margin: 0;
 }
 
+.position-list {
+  display: grid;
+  gap: 10px;
+}
+
+.position-list p {
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid #e5efe7;
+  border-radius: 12px;
+  padding: 10px 12px;
+}
+
+.position-list strong {
+  color: #166534;
+  display: block;
+  margin-bottom: 4px;
+}
+
 .insight-block ul,
 .insight-block ol {
   margin: 0;
