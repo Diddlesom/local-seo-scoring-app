@@ -245,6 +245,7 @@ export default function Home() {
   const [result, setResult] = useState<ScoreResult | null>(null);
   const [error, setError] = useState("");
   const [fetchMessage, setFetchMessage] = useState("");
+  const [scoreMessage, setScoreMessage] = useState("");
   const [isFetching, setIsFetching] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [logoFailed, setLogoFailed] = useState(false);
@@ -260,12 +261,14 @@ export default function Home() {
     setForm(exampleFormState);
     setError("");
     setFetchMessage("");
+    setScoreMessage("");
     setResult(null);
   }
 
   async function handleFetchUrl() {
     setError("");
     setFetchMessage("");
+    setScoreMessage("");
     setResult(null);
 
     if (!form.websiteUrl.trim()) {
@@ -330,6 +333,7 @@ export default function Home() {
     event.preventDefault();
     setIsLoading(true);
     setError("");
+    setScoreMessage("");
     setResult(null);
 
     try {
@@ -357,6 +361,7 @@ export default function Home() {
 
       const data = (await response.json()) as ScoreResult;
       setResult(data);
+      setScoreMessage("Page scored successfully.");
       window.requestAnimationFrame(() => {
         document
           .getElementById("results")
@@ -589,6 +594,10 @@ export default function Home() {
 
       {result ? (
         <section className="results" id="results" aria-live="polite">
+          {scoreMessage ? (
+            <p className="score-success">{scoreMessage}</p>
+          ) : null}
+
           <div className="score-summary card">
             <div className="score-main">
               <span className="summary-label">Total score</span>
