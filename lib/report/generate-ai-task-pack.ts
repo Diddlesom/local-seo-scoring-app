@@ -1,10 +1,15 @@
-import type { BenchmarkCompetitor, ReportPageDetails } from "./generate-report";
+import type {
+  BenchmarkCompetitor,
+  BenchmarkInsights,
+  ReportPageDetails
+} from "./generate-report";
 import type { PrioritizedAction, ScoreResult } from "../scoring/types";
 
 type GenerateAiTaskPackInput = {
   page: ReportPageDetails;
   result: ScoreResult;
   benchmark?: BenchmarkCompetitor[];
+  benchmarkInsights?: BenchmarkInsights | null;
 };
 
 const priorityLabels: Record<PrioritizedAction["priority"], string> = {
@@ -371,10 +376,44 @@ function formatBenchmarkContext(benchmark?: BenchmarkCompetitor[]): string {
     .join("\n\n");
 }
 
+function formatBenchmarkInsightsContext(
+  insights?: BenchmarkInsights | null
+): string {
+  if (!insights) {
+    return "No combined competitor insights have been generated yet.";
+  }
+
+  return [
+    "Combined competitor insights:",
+    ...insights.commonPatterns.map((pattern) => `- ${cleanText(pattern)}`),
+    "",
+    "Majority signals:",
+    ...(insights.majoritySignals.length
+      ? insights.majoritySignals.map((signal) => `- ${cleanText(signal)}`)
+      : ["- None found"]),
+    "",
+    "Content depth comparison:",
+    `- ${cleanText(insights.contentDepthComparison)}`,
+    "",
+    "Key gaps on target page:",
+    ...(insights.keyGaps.length
+      ? insights.keyGaps.map((gap) => `- ${cleanText(gap)}`)
+      : ["- None found"]),
+    "",
+    "Priority actions based on competitors:",
+    ...(insights.priorityActions.length
+      ? insights.priorityActions.map(
+          (action, index) => `${index + 1}. ${cleanText(action)}`
+        )
+      : ["No benchmark-driven priority actions found."])
+  ].join("\n");
+}
+
 export function generateAiTaskPack({
   page,
   result,
-  benchmark
+  benchmark,
+  benchmarkInsights
 }: GenerateAiTaskPackInput): string {
   return [
     "LOCAL SEO AI TASK PACK",
@@ -397,6 +436,8 @@ export function generateAiTaskPack({
     `- Score / grade: ${result.totalScore}/100 (${result.grade})`,
     "",
     "COMPETITOR BENCHMARK CONTEXT",
+    formatBenchmarkInsightsContext(benchmarkInsights),
+    "",
     formatBenchmarkContext(benchmark),
     "",
     "TASKS",

@@ -4,7 +4,10 @@ import { useState } from "react";
 import type { FormEvent } from "react";
 import { generateAiTaskPack } from "../lib/report/generate-ai-task-pack";
 import { generateDeveloperReport } from "../lib/report/generate-report";
-import type { BenchmarkCompetitor } from "../lib/report/generate-report";
+import type {
+  BenchmarkCompetitor,
+  BenchmarkInsights
+} from "../lib/report/generate-report";
 import { generatePdfReport } from "../lib/report/generate-pdf-report";
 import { scoringConfig } from "../lib/scoring/config";
 import type { ScoreResult } from "../lib/scoring/types";
@@ -217,32 +220,211 @@ function getBenchmarkGaps({
   const competitorHeadingCount = getHeadingsCount(competitor);
 
   if (competitor.signals.wordCount > targetResult.signals.wordCount + 150) {
-    gaps.add("Competitor has deeper page content than the target page.");
+    gaps.add(
+      "Add more useful service detail because this competitor has deeper page content than your target page."
+    );
   }
 
   if (competitorHeadingCount > targetHeadingCount + 2) {
-    gaps.add("Competitor uses more heading structure than the target page.");
+    gaps.add(
+      "Expand the page structure with clearer service subheadings because this competitor uses more headings."
+    );
   }
 
   competitor.signals.schemaTypes.forEach((schemaType) => {
     if (!targetResult.signals.schemaTypes.includes(schemaType)) {
-      gaps.add(`Competitor uses ${schemaType} schema that the target page lacks.`);
+      gaps.add(
+        `Add or review ${schemaType} schema because this competitor uses it and your target page does not.`
+      );
     }
   });
 
   competitor.signals.trustSignals.forEach((trustSignal) => {
     if (!targetResult.signals.trustSignals.includes(trustSignal)) {
-      gaps.add(`Competitor shows trust signal missing from target: ${trustSignal}.`);
+      gaps.add(
+        `Add visible trust proof for ${trustSignal.toLowerCase()} because this competitor shows it and your page does not.`
+      );
     }
   });
 
   competitorTopics.forEach((topic) => {
     if (!targetTopics.includes(topic)) {
-      gaps.add(`Competitor mentions ${topic}, but the target page does not.`);
+      gaps.add(
+        `Add a clear mention or short section for ${topic} because competitors cover it and your target page does not.`
+      );
     }
   });
 
   return Array.from(gaps).slice(0, 6);
+}
+
+function countValues(items: string[]): Array<{ value: string; count: number }> {
+  const counts = new Map<string, number>();
+
+  items.forEach((item) => {
+    counts.set(item, (counts.get(item) ?? 0) + 1);
+  });
+
+  return Array.from(counts.entries())
+    .map(([value, count]) => ({ value, count }))
+    .sort((first, second) => second.count - first.count);
+}
+
+function getTrustStrength(trustSignals: string[]): "Strong" | "Medium" | "Weak" {
+  if (trustSignals.length >= 3) {
+    return "Strong";
+  }
+
+  if (trustSignals.length >= 1) {
+    return "Medium";
+  }
+
+  return "Weak";
+}
+
+function getCompetitorName(competitor: BenchmarkCompetitor): string {
+  if (competitor.title) {
+    return competitor.title;
+  }
+
+  try {
+    return new URL(competitor.url).hostname.replace(/^www\./, "");
+  } catch {
+    return competitor.url;
+  }
+}
+
+function buildBenchmarkInsights({
+  competitors,
+  targetResult,
+  targetText
+}: {
+  competitors: BenchmarkCompetitor[];
+  targetResult: ScoreResult;
+  targetText: string;
+}): BenchmarkInsights | null {
+  if (competitors.length === 0) {
+    return null;
+  }
+
+  const majorityCount = Math.floor(competitors.length / 2) + 1;
+  const averageWordCount = Math.round(
+    competitors.reduce((total, competitor) => total + competitor.wordCount, 0) /
+      competitors.length
+  );
+  const targetTopics = detectTopicsServices(targetText);
+  const topicCounts = countValues(
+    competitors.flatMap((competitor) => competitor.topicsServices)
+  );
+  const trustCounts = countValues(
+    competitors.flatMap((competitor) => competitor.trustSignals)
+  );
+  const schemaCounts = countValues(
+    competitors.flatMap((competitor) => competitor.schemaTypes)
+  );
+  const majorityTopics = topicCounts.filter(
+    (topic) => topic.count >= majorityCount
+  );
+  const majorityTrustSignals = trustCounts.filter(
+    (signal) => signal.count >= majorityCount
+  );
+  const majoritySchemaTypes = schemaCounts.filter(
+    (schema) => schema.count >= majorityCount
+  );
+  const keyGaps = Array.from(
+    new Set(competitors.flatMap((competitor) => competitor.gapsFound))
+  ).slice(0, 8);
+  const missingMajorityTopics = majorityTopics
+    .filter((topic) => !targetTopics.includes(topic.value))
+    .map(
+      (topic) =>
+        `Add coverage for ${topic.value}; ${topic.count}/${competitors.length} competitors mention it.`
+    );
+  const missingMajorityTrustSignals = majorityTrustSignals
+    .filter((signal) => !targetResult.signals.trustSignals.includes(signal.value))
+    .map(
+      (signal) =>
+        `Add visible proof for ${signal.value.toLowerCase()}; ${signal.count}/${competitors.length} competitors show it.`
+    );
+  const missingMajoritySchemaTypes = majoritySchemaTypes
+    .filter((schema) => !targetResult.signals.schemaTypes.includes(schema.value))
+    .map(
+      (schema) =>
+        `Add or validate ${schema.value} schema; ${schema.count}/${competitors.length} competitors use it.`
+    );
+  const contentDepthComparison =
+    targetResult.signals.wordCount >= averageWordCount
+      ? `Your page has ${targetResult.signals.wordCount} words versus a competitor average of ${averageWordCount}. Content depth is competitive.`
+      : `Your page has ${targetResult.signals.wordCount} words versus a competitor average of ${averageWordCount}. Add more specific service and local detail.`;
+
+  return {
+    commonPatterns: [
+      ...majorityTopics.map(
+        (topic) =>
+          `${topic.count}/${competitors.length} competitors mention ${topic.value}.`
+      ),
+      ...majoritySchemaTypes.map(
+        (schema) =>
+          `${schema.count}/${competitors.length} competitors use ${schema.value} schema.`
+      ),
+      ...majorityTrustSignals.map(
+        (signal) =>
+          `${signal.count}/${competitors.length} competitors show ${signal.value.toLowerCase()}.`
+      )
+    ].slice(0, 8),
+    majoritySignals: [
+      ...majorityTopics.map(
+        (topic) => `${topic.value}: ${topic.count}/${competitors.length}`
+      ),
+      ...majorityTrustSignals.map(
+        (signal) => `${signal.value}: ${signal.count}/${competitors.length}`
+      ),
+      ...majoritySchemaTypes.map(
+        (schema) => `${schema.value} schema: ${schema.count}/${competitors.length}`
+      )
+    ].slice(0, 8),
+    contentDepthComparison,
+    topicServiceOverlap: topicCounts
+      .slice(0, 8)
+      .map(
+        (topic) =>
+          `${topic.value}: found on ${topic.count}/${competitors.length} competitors`
+      ),
+    trustSignalPresence: trustCounts.length
+      ? trustCounts.map(
+          (signal) =>
+            `${signal.value}: found on ${signal.count}/${competitors.length} competitors`
+        )
+      : ["No strong trust signals were detected across competitors."],
+    schemaUsage: schemaCounts.length
+      ? schemaCounts.map(
+          (schema) =>
+            `${schema.value}: used by ${schema.count}/${competitors.length} competitors`
+        )
+      : ["No target schema types were detected across competitors."],
+    keyGaps,
+    priorityActions: [
+      ...(targetResult.signals.wordCount < averageWordCount
+        ? [
+            `Expand content depth toward the competitor average of ${averageWordCount} words with useful service and local detail.`
+          ]
+        : []),
+      ...missingMajorityTopics,
+      ...missingMajorityTrustSignals,
+      ...missingMajoritySchemaTypes,
+      ...keyGaps
+    ].slice(0, 8),
+    summaryRows: competitors.map((competitor) => ({
+      name: getCompetitorName(competitor),
+      url: competitor.url,
+      wordCount: competitor.wordCount,
+      headingsCount: competitor.headingsCount,
+      schemaPresence: competitor.schemaTypes.length
+        ? competitor.schemaTypes.join(", ")
+        : "None",
+      trustStrength: getTrustStrength(competitor.trustSignals)
+    }))
+  };
 }
 
 function formatIssueText(issue: string): string {
@@ -373,6 +555,102 @@ function InlineList({
   }
 
   return <span>{items.join(", ")}</span>;
+}
+
+function BenchmarkInsightsPanel({
+  insights
+}: {
+  insights: BenchmarkInsights;
+}) {
+  return (
+    <div className="combined-insights">
+      <section className="insight-block">
+        <span className="eyebrow">Combined Competitor Insights</span>
+        <h3>What competitors are doing well</h3>
+        <ResultList items={insights.commonPatterns} />
+      </section>
+
+      <section className="insight-block">
+        <h3>Majority signals</h3>
+        <ResultList items={insights.majoritySignals} />
+      </section>
+
+      <section className="insight-block">
+        <h3>Content depth comparison</h3>
+        <p>{insights.contentDepthComparison}</p>
+      </section>
+
+      <section className="insight-block">
+        <h3>Topic/service overlap</h3>
+        <ResultList items={insights.topicServiceOverlap} />
+      </section>
+
+      <section className="insight-block">
+        <h3>Trust signal presence</h3>
+        <ResultList items={insights.trustSignalPresence} />
+      </section>
+
+      <section className="insight-block">
+        <h3>Schema usage</h3>
+        <ResultList items={insights.schemaUsage} />
+      </section>
+
+      <section className="insight-block highlight-block">
+        <h3>Key gaps on your page</h3>
+        <ResultList items={insights.keyGaps} />
+      </section>
+
+      <section className="insight-block highlight-block">
+        <h3>Priority actions based on competitors</h3>
+        {insights.priorityActions.length > 0 ? (
+          <ol>
+            {insights.priorityActions.map((action) => (
+              <li key={action}>{action}</li>
+            ))}
+          </ol>
+        ) : (
+          <p className="empty">No benchmark-driven priority actions found.</p>
+        )}
+      </section>
+
+      <section className="insight-block summary-table-block">
+        <h3>Competitor summary table</h3>
+        <div className="benchmark-table-wrap">
+          <table className="benchmark-table">
+            <thead>
+              <tr>
+                <th>URL or name</th>
+                <th>Words</th>
+                <th>Headings</th>
+                <th>Schema</th>
+                <th>Trust</th>
+              </tr>
+            </thead>
+            <tbody>
+              {insights.summaryRows.map((row) => (
+                <tr key={row.url}>
+                  <td>
+                    <strong>{row.name}</strong>
+                    <span>{row.url}</span>
+                  </td>
+                  <td>{row.wordCount}</td>
+                  <td>{row.headingsCount}</td>
+                  <td>{row.schemaPresence}</td>
+                  <td>
+                    <span
+                      className={`strength-pill strength-${row.trustStrength.toLowerCase()}`}
+                    >
+                      {row.trustStrength}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+  );
 }
 
 function createReportFileName(url: string): string {
@@ -693,7 +971,8 @@ export default function Home() {
         relatedInternalLinks: form.reportData.relatedInternalLinks
       },
       result,
-      benchmark: benchmarkResults.filter((benchmark) => !benchmark.error)
+      benchmark: completedBenchmarkResults,
+      benchmarkInsights
     });
 
     downloadTextFile(report, createReportFileName(form.websiteUrl));
@@ -716,7 +995,8 @@ export default function Home() {
         relatedInternalLinks: form.reportData.relatedInternalLinks
       },
       result,
-      benchmark: benchmarkResults.filter((benchmark) => !benchmark.error)
+      benchmark: completedBenchmarkResults,
+      benchmarkInsights
     });
 
     downloadTextFile(taskPack, createAiTaskPackFileName(form.websiteUrl));
@@ -747,6 +1027,18 @@ export default function Home() {
       setIsPdfExporting(false);
     }
   }
+
+  const completedBenchmarkResults = benchmarkResults.filter(
+    (benchmark): benchmark is BenchmarkCompetitor => !benchmark.error
+  );
+  const benchmarkInsights =
+    result && completedBenchmarkResults.length > 0
+      ? buildBenchmarkInsights({
+          competitors: completedBenchmarkResults,
+          targetResult: result,
+          targetText: form.pageContent
+        })
+      : null;
 
   return (
     <main className="page">
@@ -968,6 +1260,10 @@ export default function Home() {
         ) : null}
         {benchmarkMessage ? (
           <p className="success">{benchmarkMessage}</p>
+        ) : null}
+
+        {benchmarkInsights ? (
+          <BenchmarkInsightsPanel insights={benchmarkInsights} />
         ) : null}
 
         {benchmarkResults.length > 0 ? (

@@ -233,6 +233,120 @@ nav a:hover {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.combined-insights {
+  background:
+    radial-gradient(circle at top left, rgba(34, 197, 94, 0.12), transparent 30%),
+    #ffffff;
+  border: 1px solid rgba(34, 197, 94, 0.2);
+  border-radius: 20px;
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  padding: 18px;
+}
+
+.insight-block {
+  background: rgba(248, 252, 249, 0.92);
+  border: 1px solid #e1ede4;
+  border-radius: 16px;
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+}
+
+.insight-block h3 {
+  color: #12201a;
+  font-size: 16px;
+  margin: 0;
+}
+
+.insight-block p {
+  color: #4f6257;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.insight-block ul,
+.insight-block ol {
+  margin: 0;
+}
+
+.highlight-block {
+  background: #fffdf6;
+  border-color: #eadfbf;
+}
+
+.summary-table-block {
+  grid-column: 1 / -1;
+}
+
+.benchmark-table-wrap {
+  overflow-x: auto;
+}
+
+.benchmark-table {
+  border-collapse: collapse;
+  min-width: 720px;
+  width: 100%;
+}
+
+.benchmark-table th {
+  color: #5f7b68;
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  padding: 10px;
+  text-align: left;
+  text-transform: uppercase;
+}
+
+.benchmark-table td {
+  border-top: 1px solid #e5efe7;
+  color: #273b30;
+  font-size: 14px;
+  line-height: 1.4;
+  padding: 12px 10px;
+  vertical-align: top;
+}
+
+.benchmark-table td:first-child {
+  min-width: 240px;
+}
+
+.benchmark-table td strong {
+  display: block;
+}
+
+.benchmark-table td span:not(.strength-pill) {
+  color: #607166;
+  display: block;
+  font-size: 12px;
+  margin-top: 3px;
+  overflow-wrap: anywhere;
+}
+
+.strength-pill {
+  border-radius: 999px;
+  display: inline-flex;
+  font-size: 12px;
+  font-weight: 900;
+  padding: 5px 9px;
+}
+
+.strength-strong {
+  background: rgba(34, 197, 94, 0.14);
+  color: #166534;
+}
+
+.strength-medium {
+  background: rgba(228, 161, 27, 0.14);
+  color: #8a5a00;
+}
+
+.strength-weak {
+  background: rgba(163, 56, 36, 0.1);
+  color: #a33824;
+}
+
 .benchmark-card {
   background: linear-gradient(180deg, #ffffff, #f8fcf9);
   border: 1px solid #dbe9de;
@@ -824,6 +938,7 @@ li {
   .form-grid,
   .competitor-grid,
   .benchmark-results,
+  .combined-insights,
   .score-summary,
   .result-grid,
   .recommendation-groups {

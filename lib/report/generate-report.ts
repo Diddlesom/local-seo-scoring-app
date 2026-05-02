@@ -28,10 +28,30 @@ export type BenchmarkCompetitor = {
   gapsFound: string[];
 };
 
+export type BenchmarkInsights = {
+  commonPatterns: string[];
+  majoritySignals: string[];
+  contentDepthComparison: string;
+  topicServiceOverlap: string[];
+  trustSignalPresence: string[];
+  schemaUsage: string[];
+  keyGaps: string[];
+  priorityActions: string[];
+  summaryRows: Array<{
+    name: string;
+    url: string;
+    wordCount: number;
+    headingsCount: number;
+    schemaPresence: string;
+    trustStrength: "Strong" | "Medium" | "Weak";
+  }>;
+};
+
 type GenerateReportInput = {
   page: ReportPageDetails;
   result: ScoreResult;
   benchmark?: BenchmarkCompetitor[];
+  benchmarkInsights?: BenchmarkInsights | null;
 };
 
 const priorityLabels: Record<PrioritizedAction["priority"], string> = {
@@ -238,6 +258,54 @@ function formatBenchmark(benchmark?: BenchmarkCompetitor[]): string {
       ].join("\n")
     )
     .join("\n\n");
+}
+
+function formatBenchmarkInsights(insights?: BenchmarkInsights | null): string {
+  if (!insights) {
+    return "No combined competitor insights have been generated yet.";
+  }
+
+  return [
+    "Combined Competitor Insights",
+    "",
+    "Common patterns across competitors:",
+    listItems(insights.commonPatterns),
+    "",
+    "Majority signals:",
+    listItems(insights.majoritySignals),
+    "",
+    "Content depth comparison:",
+    `- ${cleanReportText(insights.contentDepthComparison)}`,
+    "",
+    "Topic/service overlap:",
+    listItems(insights.topicServiceOverlap),
+    "",
+    "Trust signal presence:",
+    listItems(insights.trustSignalPresence),
+    "",
+    "Schema usage:",
+    listItems(insights.schemaUsage),
+    "",
+    "Key gaps on your page:",
+    listItems(insights.keyGaps),
+    "",
+    "Priority actions based on competitors:",
+    insights.priorityActions.length
+      ? insights.priorityActions
+          .map((action, index) => `${index + 1}. ${cleanReportText(action)}`)
+          .join("\n")
+      : "No benchmark-driven priority actions found.",
+    "",
+    "Competitor summary table:",
+    insights.summaryRows.length
+      ? insights.summaryRows
+          .map(
+            (row) =>
+              `- ${cleanReportText(row.name)} | Words: ${row.wordCount} | Headings: ${row.headingsCount} | Schema: ${row.schemaPresence} | Trust: ${row.trustStrength} | ${row.url}`
+          )
+          .join("\n")
+      : "- No competitor rows found"
+  ].join("\n");
 }
 
 function getDoNotChangeItems(result: ScoreResult): string[] {
@@ -516,7 +584,8 @@ function formatTasks(
 export function generateDeveloperReport({
   page,
   result,
-  benchmark
+  benchmark,
+  benchmarkInsights
 }: GenerateReportInput): string {
   return [
     "LOCAL SEO DEVELOPER TASK SHEET",
@@ -535,6 +604,8 @@ export function generateDeveloperReport({
     listItems(getDoNotChangeItems(result)),
     "",
     "COMPETITOR BENCHMARK",
+    formatBenchmarkInsights(benchmarkInsights),
+    "",
     formatBenchmark(benchmark),
     "",
     "TASKS FOR DEVELOPER",
