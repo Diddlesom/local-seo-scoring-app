@@ -149,6 +149,40 @@ function ResultList({ items }: { items: string[] }) {
   );
 }
 
+function TopIssues({ result }: { result: ScoreResult }) {
+  const issues =
+    result.weaknesses.length > 0
+      ? result.weaknesses.slice(0, 3)
+      : result.missingItems.length > 0
+        ? result.missingItems.slice(0, 3)
+        : result.prioritizedActions.length > 0
+          ? result.prioritizedActions
+              .slice(0, 3)
+              .map((action) => action.action)
+          : [];
+
+  return (
+    <section className="top-issues card">
+      <div>
+        <span className="eyebrow">Priority snapshot</span>
+        <h2>Top issues found</h2>
+      </div>
+      {issues.length > 0 ? (
+        <ul>
+          {issues.map((issue) => (
+            <li key={issue}>{issue}</li>
+          ))}
+        </ul>
+      ) : (
+        <p>
+          No major issues found. Review recommended actions for optional
+          improvements.
+        </p>
+      )}
+    </section>
+  );
+}
+
 function CategoryScoreBar({
   category,
   score
@@ -361,7 +395,7 @@ export default function Home() {
 
       const data = (await response.json()) as ScoreResult;
       setResult(data);
-      setScoreMessage("Page scored successfully.");
+      setScoreMessage("Page analysed successfully.");
       window.requestAnimationFrame(() => {
         document
           .getElementById("results")
@@ -447,7 +481,7 @@ export default function Home() {
 
       <section className="hero">
         <div>
-          <span className="eyebrow">Local SEO dashboard</span>
+          <span className="product-badge">CWC Local SEO Toolkit</span>
           <h1>
             Score local service pages and turn gaps into clear, actionable SEO
             tasks.
@@ -463,10 +497,12 @@ export default function Home() {
         </div>
       </section>
 
+      <div className="hero-divider" />
+
       <form className="score-form card" id="score-page" onSubmit={handleSubmit}>
         <div className="card-heading">
           <div>
-            <span className="eyebrow">Page input</span>
+            <span className="eyebrow">Page Input</span>
             <h2>Score a local service page</h2>
           </div>
           <button
@@ -584,7 +620,7 @@ export default function Home() {
 
         <div className="form-actions">
           <button className="primary-button" disabled={isLoading} type="submit">
-            {isLoading ? "Scoring..." : "Score Page"}
+            {isLoading ? "Scoring..." : "🚀 Score Page"}
           </button>
         </div>
 
@@ -610,6 +646,8 @@ export default function Home() {
             </div>
           </div>
 
+          <TopIssues result={result} />
+
           <section className="panel card">
             <div className="card-heading">
               <div>
@@ -631,7 +669,7 @@ export default function Home() {
           <section className="export-panel card" id="exports">
             <div>
               <span className="eyebrow">Reports</span>
-              <h2>Export Reports</h2>
+              <h2>Export results</h2>
               <p>
                 Download a developer-ready report or a controlled AI task pack.
               </p>
