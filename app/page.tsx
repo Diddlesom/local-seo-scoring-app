@@ -164,7 +164,11 @@ const topicKeywords = [
 
 function ResultList({ items }: { items: string[] }) {
   if (items.length === 0) {
-    return <p className="empty">Nothing found yet.</p>;
+    return (
+      <p className="empty">
+        Not enough competitor overlap to identify strong patterns yet
+      </p>
+    );
   }
 
   return (
@@ -294,6 +298,94 @@ function getCompetitorName(competitor: BenchmarkCompetitor): string {
   }
 }
 
+function formatCompetitorCount(count: number, total: number): string {
+  return `${count} of ${total} competitors`;
+}
+
+function simplifyBenchmarkGap(gap: string): string {
+  const cleanGap = gap.toLowerCase();
+
+  if (cleanGap.includes("deeper page content")) {
+    return "Content depth below competitors";
+  }
+
+  if (cleanGap.includes("more headings")) {
+    return "Page structure has fewer service subheadings";
+  }
+
+  if (cleanGap.includes("schema")) {
+    const schemaMatch = gap.match(/([A-Za-z]+)\s+schema/i);
+    const schemaType = schemaMatch?.[1] ?? schemaMatch?.[2] ?? "schema";
+
+    return `Missing ${schemaType} schema used by competitors`;
+  }
+
+  if (cleanGap.includes("trust proof")) {
+    const trustMatch = gap.match(/for (.*?) because/i);
+    const trustSignal = trustMatch?.[1] ?? "trust proof";
+
+    return `Missing ${trustSignal} (used by competitors)`;
+  }
+
+  if (cleanGap.includes("short section for")) {
+    const topicMatch = gap.match(/for (.*?) because/i);
+    const topic = topicMatch?.[1] ?? "service coverage";
+
+    return `Missing ${topic} coverage`;
+  }
+
+  return gap;
+}
+
+function uniqueItems(items: string[]): string[] {
+  return Array.from(new Set(items));
+}
+
+function groupPriorityActions(actions: string[]): BenchmarkInsights["priorityActionGroups"] {
+  const groups: BenchmarkInsights["priorityActionGroups"] = {
+    contentDepth: [],
+    trustSignals: [],
+    serviceCoverage: [],
+    pageStructure: []
+  };
+
+  uniqueItems(actions).forEach((action) => {
+    const cleanAction = action.toLowerCase();
+
+    if (
+      cleanAction.includes("content") ||
+      cleanAction.includes("word") ||
+      cleanAction.includes("service detail")
+    ) {
+      groups.contentDepth.push(action);
+      return;
+    }
+
+    if (
+      cleanAction.includes("trust") ||
+      cleanAction.includes("proof") ||
+      cleanAction.includes("review") ||
+      cleanAction.includes("testimonial")
+    ) {
+      groups.trustSignals.push(action);
+      return;
+    }
+
+    if (
+      cleanAction.includes("coverage") ||
+      cleanAction.includes("mention") ||
+      cleanAction.includes("section for")
+    ) {
+      groups.serviceCoverage.push(action);
+      return;
+    }
+
+    groups.pageStructure.push(action);
+  });
+
+  return groups;
+}
+
 function buildBenchmarkInsights({
   competitors,
   targetResult,
@@ -322,6 +414,18 @@ function buildBenchmarkInsights({
   const schemaCounts = countValues(
     competitors.flatMap((competitor) => competitor.schemaTypes)
   );
+  const averageTrustSignals = Math.round(
+    competitors.reduce(
+      (total, competitor) => total + competitor.trustSignals.length,
+      0
+    ) / competitors.length
+  );
+  const averageTopicCount = Math.round(
+    competitors.reduce(
+      (total, competitor) => total + competitor.topicsServices.length,
+      0
+    ) / competitors.length
+  );
   const majorityTopics = topicCounts.filter(
     (topic) => topic.count >= majorityCount
   );
@@ -331,56 +435,82 @@ function buildBenchmarkInsights({
   const majoritySchemaTypes = schemaCounts.filter(
     (schema) => schema.count >= majorityCount
   );
-  const keyGaps = Array.from(
-    new Set(competitors.flatMap((competitor) => competitor.gapsFound))
+  const keyGaps = uniqueItems(
+    competitors
+      .flatMap((competitor) => competitor.gapsFound)
+      .map(simplifyBenchmarkGap)
   ).slice(0, 8);
   const missingMajorityTopics = majorityTopics
     .filter((topic) => !targetTopics.includes(topic.value))
     .map(
       (topic) =>
-        `Add coverage for ${topic.value}; ${topic.count}/${competitors.length} competitors mention it.`
+        `Add ${topic.value} coverage because ${formatCompetitorCount(topic.count, competitors.length)} mention it.`
     );
   const missingMajorityTrustSignals = majorityTrustSignals
     .filter((signal) => !targetResult.signals.trustSignals.includes(signal.value))
     .map(
       (signal) =>
-        `Add visible proof for ${signal.value.toLowerCase()}; ${signal.count}/${competitors.length} competitors show it.`
+        `Add visible ${signal.value.toLowerCase()} because ${formatCompetitorCount(signal.count, competitors.length)} show it.`
     );
   const missingMajoritySchemaTypes = majoritySchemaTypes
     .filter((schema) => !targetResult.signals.schemaTypes.includes(schema.value))
     .map(
       (schema) =>
-        `Add or validate ${schema.value} schema; ${schema.count}/${competitors.length} competitors use it.`
+        `Add or validate ${schema.value} schema because ${formatCompetitorCount(schema.count, competitors.length)} use it.`
     );
   const contentDepthComparison =
     targetResult.signals.wordCount >= averageWordCount
       ? `Your page has ${targetResult.signals.wordCount} words versus a competitor average of ${averageWordCount}. Content depth is competitive.`
       : `Your page has ${targetResult.signals.wordCount} words versus a competitor average of ${averageWordCount}. Add more specific service and local detail.`;
+  const priorityActions = uniqueItems([
+    ...(targetResult.signals.wordCount < averageWordCount
+      ? [
+          `Expand content depth toward the competitor average of ${averageWordCount} words with useful service and local detail.`
+        ]
+      : []),
+    ...missingMajorityTopics,
+    ...missingMajorityTrustSignals,
+    ...missingMajoritySchemaTypes,
+    ...keyGaps
+  ]).slice(0, 8);
+  const priorityActionGroups = groupPriorityActions(priorityActions);
 
   return {
+    overallCompetitivePosition: [
+      contentDepthComparison,
+      targetResult.signals.trustSignals.length >= averageTrustSignals
+        ? `Trust signals are competitive: your page has ${targetResult.signals.trustSignals.length}, competitor average is ${averageTrustSignals}.`
+        : `Trust signals are below average: your page has ${targetResult.signals.trustSignals.length}, competitor average is ${averageTrustSignals}.`,
+      targetTopics.length >= averageTopicCount
+        ? `Service coverage is competitive: your page covers ${targetTopics.length} detected service topics, competitor average is ${averageTopicCount}.`
+        : `Service coverage is below average: your page covers ${targetTopics.length} detected service topics, competitor average is ${averageTopicCount}.`
+    ],
     commonPatterns: [
       ...majorityTopics.map(
         (topic) =>
-          `${topic.count}/${competitors.length} competitors mention ${topic.value}.`
+          `${formatCompetitorCount(topic.count, competitors.length)} mention ${topic.value}.`
       ),
       ...majoritySchemaTypes.map(
         (schema) =>
-          `${schema.count}/${competitors.length} competitors use ${schema.value} schema.`
+          `${formatCompetitorCount(schema.count, competitors.length)} use ${schema.value} schema.`
       ),
       ...majorityTrustSignals.map(
         (signal) =>
-          `${signal.count}/${competitors.length} competitors show ${signal.value.toLowerCase()}.`
+          `${formatCompetitorCount(signal.count, competitors.length)} show ${signal.value.toLowerCase()}.`
       )
     ].slice(0, 8),
     majoritySignals: [
       ...majorityTopics.map(
-        (topic) => `${topic.value}: ${topic.count}/${competitors.length}`
+        (topic) =>
+          `${topic.value}: ${formatCompetitorCount(topic.count, competitors.length)}`
       ),
       ...majorityTrustSignals.map(
-        (signal) => `${signal.value}: ${signal.count}/${competitors.length}`
+        (signal) =>
+          `${signal.value}: ${formatCompetitorCount(signal.count, competitors.length)}`
       ),
       ...majoritySchemaTypes.map(
-        (schema) => `${schema.value} schema: ${schema.count}/${competitors.length}`
+        (schema) =>
+          `${schema.value} schema: ${formatCompetitorCount(schema.count, competitors.length)}`
       )
     ].slice(0, 8),
     contentDepthComparison,
@@ -388,32 +518,23 @@ function buildBenchmarkInsights({
       .slice(0, 8)
       .map(
         (topic) =>
-          `${topic.value}: found on ${topic.count}/${competitors.length} competitors`
+          `${topic.value}: found on ${formatCompetitorCount(topic.count, competitors.length)}`
       ),
     trustSignalPresence: trustCounts.length
       ? trustCounts.map(
           (signal) =>
-            `${signal.value}: found on ${signal.count}/${competitors.length} competitors`
+            `${signal.value}: found on ${formatCompetitorCount(signal.count, competitors.length)}`
         )
       : ["No strong trust signals were detected across competitors."],
     schemaUsage: schemaCounts.length
       ? schemaCounts.map(
           (schema) =>
-            `${schema.value}: used by ${schema.count}/${competitors.length} competitors`
+            `${schema.value}: used by ${formatCompetitorCount(schema.count, competitors.length)}`
         )
       : ["No target schema types were detected across competitors."],
     keyGaps,
-    priorityActions: [
-      ...(targetResult.signals.wordCount < averageWordCount
-        ? [
-            `Expand content depth toward the competitor average of ${averageWordCount} words with useful service and local detail.`
-          ]
-        : []),
-      ...missingMajorityTopics,
-      ...missingMajorityTrustSignals,
-      ...missingMajoritySchemaTypes,
-      ...keyGaps
-    ].slice(0, 8),
+    priorityActions,
+    priorityActionGroups,
     summaryRows: competitors.map((competitor) => ({
       name: getCompetitorName(competitor),
       url: competitor.url,
@@ -562,12 +683,24 @@ function BenchmarkInsightsPanel({
 }: {
   insights: BenchmarkInsights;
 }) {
+  const actionGroups = [
+    ["Content depth", insights.priorityActionGroups.contentDepth],
+    ["Trust signals", insights.priorityActionGroups.trustSignals],
+    ["Service coverage", insights.priorityActionGroups.serviceCoverage],
+    ["Page structure", insights.priorityActionGroups.pageStructure]
+  ] as const;
+
   return (
     <div className="combined-insights">
       <section className="insight-block">
         <span className="eyebrow">Combined Competitor Insights</span>
         <h3>What competitors are doing well</h3>
         <ResultList items={insights.commonPatterns} />
+      </section>
+
+      <section className="insight-block">
+        <h3>Overall competitive position</h3>
+        <ResultList items={insights.overallCompetitivePosition} />
       </section>
 
       <section className="insight-block">
@@ -603,11 +736,20 @@ function BenchmarkInsightsPanel({
       <section className="insight-block highlight-block">
         <h3>Priority actions based on competitors</h3>
         {insights.priorityActions.length > 0 ? (
-          <ol>
-            {insights.priorityActions.map((action) => (
-              <li key={action}>{action}</li>
-            ))}
-          </ol>
+          <div className="benchmark-action-groups">
+            {actionGroups.map(([label, actions]) =>
+              actions.length > 0 ? (
+                <div key={label}>
+                  <strong>{label}</strong>
+                  <ol>
+                    {actions.map((action) => (
+                      <li key={action}>{action}</li>
+                    ))}
+                  </ol>
+                </div>
+              ) : null
+            )}
+          </div>
         ) : (
           <p className="empty">No benchmark-driven priority actions found.</p>
         )}

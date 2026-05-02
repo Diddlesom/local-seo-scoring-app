@@ -271,6 +271,25 @@ nav a:hover {
   margin: 0;
 }
 
+.benchmark-action-groups {
+  display: grid;
+  gap: 12px;
+}
+
+.benchmark-action-groups div {
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid #eadfbf;
+  border-radius: 12px;
+  padding: 12px;
+}
+
+.benchmark-action-groups strong {
+  color: #166534;
+  display: block;
+  font-size: 14px;
+  margin-bottom: 8px;
+}
+
 .highlight-block {
   background: #fffdf6;
   border-color: #eadfbf;

@@ -105,6 +105,41 @@ function getStrongInternalLinks(
   return strongLinks.map(({ text, url }) => ({ text, url }));
 }
 
+function simplifyBenchmarkGap(gap: string): string {
+  const cleanGap = gap.toLowerCase();
+
+  if (cleanGap.includes("deeper page content")) {
+    return "Content depth below competitors";
+  }
+
+  if (cleanGap.includes("more headings")) {
+    return "Page structure has fewer service subheadings";
+  }
+
+  if (cleanGap.includes("schema")) {
+    const schemaMatch = gap.match(/([A-Za-z]+)\s+schema/i);
+    const schemaType = schemaMatch?.[1] ?? "schema";
+
+    return `Missing ${schemaType} schema used by competitors`;
+  }
+
+  if (cleanGap.includes("trust proof")) {
+    const trustMatch = gap.match(/for (.*?) because/i);
+    const trustSignal = trustMatch?.[1] ?? "trust proof";
+
+    return `Missing ${trustSignal} (used by competitors)`;
+  }
+
+  if (cleanGap.includes("short section for")) {
+    const topicMatch = gap.match(/for (.*?) because/i);
+    const topic = topicMatch?.[1] ?? "service coverage";
+
+    return `Missing ${topic} coverage`;
+  }
+
+  return gap;
+}
+
 function getFaqJsonLd(page: ReportPageDetails): string {
   const faqItems = page.faqItems.length
     ? page.faqItems
@@ -369,8 +404,11 @@ function formatBenchmarkContext(benchmark?: BenchmarkCompetitor[]): string {
         }`,
         "Target page gaps found:",
         competitor.gapsFound.length
-          ? competitor.gapsFound.map((gap) => `- ${cleanText(gap)}`).join("\n")
-          : "- None found"
+          ? competitor.gapsFound
+              .map(simplifyBenchmarkGap)
+              .map((gap) => `- ${cleanText(gap)}`)
+              .join("\n")
+          : "- No consistent patterns detected across competitors yet"
       ].join("\n")
     )
     .join("\n\n");
@@ -390,7 +428,14 @@ function formatBenchmarkInsightsContext(
     "Majority signals:",
     ...(insights.majoritySignals.length
       ? insights.majoritySignals.map((signal) => `- ${cleanText(signal)}`)
-      : ["- None found"]),
+      : ["- Not enough competitor overlap to identify strong patterns yet"]),
+    "",
+    "Overall competitive position:",
+    ...(insights.overallCompetitivePosition.length
+      ? insights.overallCompetitivePosition.map(
+          (position) => `- ${cleanText(position)}`
+        )
+      : ["- Not enough competitor overlap to identify strong patterns yet"]),
     "",
     "Content depth comparison:",
     `- ${cleanText(insights.contentDepthComparison)}`,
@@ -398,15 +443,37 @@ function formatBenchmarkInsightsContext(
     "Key gaps on target page:",
     ...(insights.keyGaps.length
       ? insights.keyGaps.map((gap) => `- ${cleanText(gap)}`)
-      : ["- None found"]),
+      : ["- No consistent patterns detected across competitors yet"]),
     "",
     "Priority actions based on competitors:",
-    ...(insights.priorityActions.length
-      ? insights.priorityActions.map(
-          (action, index) => `${index + 1}. ${cleanText(action)}`
-        )
-      : ["No benchmark-driven priority actions found."])
+    ...formatBenchmarkActionGroups(insights)
   ].join("\n");
+}
+
+function formatBenchmarkActionGroups(insights: BenchmarkInsights): string[] {
+  const groups = [
+    ["Content depth", insights.priorityActionGroups.contentDepth],
+    ["Trust signals", insights.priorityActionGroups.trustSignals],
+    ["Service coverage", insights.priorityActionGroups.serviceCoverage],
+    ["Page structure", insights.priorityActionGroups.pageStructure]
+  ] as const;
+  const output: string[] = [];
+
+  groups.forEach(([label, actions]) => {
+    if (actions.length === 0) {
+      return;
+    }
+
+    output.push(label);
+    actions.forEach((action, index) => {
+      output.push(`${index + 1}. ${cleanText(action)}`);
+    });
+    output.push("");
+  });
+
+  return output.length
+    ? output
+    : ["No benchmark-driven priority actions found."];
 }
 
 export function generateAiTaskPack({

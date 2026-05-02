@@ -29,6 +29,7 @@ export type BenchmarkCompetitor = {
 };
 
 export type BenchmarkInsights = {
+  overallCompetitivePosition: string[];
   commonPatterns: string[];
   majoritySignals: string[];
   contentDepthComparison: string;
@@ -37,6 +38,12 @@ export type BenchmarkInsights = {
   schemaUsage: string[];
   keyGaps: string[];
   priorityActions: string[];
+  priorityActionGroups: {
+    contentDepth: string[];
+    trustSignals: string[];
+    serviceCoverage: string[];
+    pageStructure: string[];
+  };
   summaryRows: Array<{
     name: string;
     url: string;
@@ -217,12 +224,50 @@ function getAssistantInstructions(): string[] {
   ];
 }
 
-function listItems(items: string[]): string {
+function listItems(
+  items: string[],
+  emptyText = "- None found"
+): string {
   if (items.length === 0) {
-    return "- None found";
+    return emptyText;
   }
 
   return items.map((item) => `- ${cleanReportText(item)}`).join("\n");
+}
+
+function simplifyBenchmarkGap(gap: string): string {
+  const cleanGap = gap.toLowerCase();
+
+  if (cleanGap.includes("deeper page content")) {
+    return "Content depth below competitors";
+  }
+
+  if (cleanGap.includes("more headings")) {
+    return "Page structure has fewer service subheadings";
+  }
+
+  if (cleanGap.includes("schema")) {
+    const schemaMatch = gap.match(/([A-Za-z]+)\s+schema/i);
+    const schemaType = schemaMatch?.[1] ?? "schema";
+
+    return `Missing ${schemaType} schema used by competitors`;
+  }
+
+  if (cleanGap.includes("trust proof")) {
+    const trustMatch = gap.match(/for (.*?) because/i);
+    const trustSignal = trustMatch?.[1] ?? "trust proof";
+
+    return `Missing ${trustSignal} (used by competitors)`;
+  }
+
+  if (cleanGap.includes("short section for")) {
+    const topicMatch = gap.match(/for (.*?) because/i);
+    const topic = topicMatch?.[1] ?? "service coverage";
+
+    return `Missing ${topic} coverage`;
+  }
+
+  return gap;
 }
 
 function formatBenchmark(benchmark?: BenchmarkCompetitor[]): string {
@@ -254,10 +299,36 @@ function formatBenchmark(benchmark?: BenchmarkCompetitor[]): string {
             : "None detected"
         }`,
         "Target page gaps found:",
-        listItems(competitor.gapsFound)
+        listItems(
+          competitor.gapsFound.map(simplifyBenchmarkGap),
+          "- No consistent patterns detected across competitors yet"
+        )
       ].join("\n")
     )
     .join("\n\n");
+}
+
+function formatBenchmarkActionGroups(insights: BenchmarkInsights): string {
+  const groups = [
+    ["Content depth", insights.priorityActionGroups.contentDepth],
+    ["Trust signals", insights.priorityActionGroups.trustSignals],
+    ["Service coverage", insights.priorityActionGroups.serviceCoverage],
+    ["Page structure", insights.priorityActionGroups.pageStructure]
+  ] as const;
+  const formattedGroups = groups
+    .filter(([, actions]) => actions.length > 0)
+    .map(([label, actions]) =>
+      [
+        label,
+        ...actions.map(
+          (action, index) => `${index + 1}. ${cleanReportText(action)}`
+        )
+      ].join("\n")
+    );
+
+  return formattedGroups.length
+    ? formattedGroups.join("\n\n")
+    : "No benchmark-driven priority actions found.";
 }
 
 function formatBenchmarkInsights(insights?: BenchmarkInsights | null): string {
@@ -269,10 +340,22 @@ function formatBenchmarkInsights(insights?: BenchmarkInsights | null): string {
     "Combined Competitor Insights",
     "",
     "Common patterns across competitors:",
-    listItems(insights.commonPatterns),
+    listItems(
+      insights.commonPatterns,
+      "- No consistent patterns detected across competitors yet"
+    ),
+    "",
+    "Overall competitive position:",
+    listItems(
+      insights.overallCompetitivePosition,
+      "- Not enough competitor overlap to identify strong patterns yet"
+    ),
     "",
     "Majority signals:",
-    listItems(insights.majoritySignals),
+    listItems(
+      insights.majoritySignals,
+      "- Not enough competitor overlap to identify strong patterns yet"
+    ),
     "",
     "Content depth comparison:",
     `- ${cleanReportText(insights.contentDepthComparison)}`,
@@ -287,14 +370,13 @@ function formatBenchmarkInsights(insights?: BenchmarkInsights | null): string {
     listItems(insights.schemaUsage),
     "",
     "Key gaps on your page:",
-    listItems(insights.keyGaps),
+    listItems(
+      insights.keyGaps,
+      "- No consistent patterns detected across competitors yet"
+    ),
     "",
     "Priority actions based on competitors:",
-    insights.priorityActions.length
-      ? insights.priorityActions
-          .map((action, index) => `${index + 1}. ${cleanReportText(action)}`)
-          .join("\n")
-      : "No benchmark-driven priority actions found.",
+    formatBenchmarkActionGroups(insights),
     "",
     "Competitor summary table:",
     insights.summaryRows.length
