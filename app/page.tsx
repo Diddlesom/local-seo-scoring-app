@@ -162,10 +162,10 @@ function CategoryScoreBar({
   return (
     <div className="score-bar-row">
       <div className="score-bar-label">
-        <span>{categoryLabels[category]}</span>
-        <strong>
-          {score}/{maxScore}
-        </strong>
+        <span>
+          {categoryLabels[category]} — {score}
+        </span>
+        <strong>of {maxScore}</strong>
       </div>
       <div
         aria-label={`${categoryLabels[category]} score ${score} out of ${maxScore}`}
@@ -357,6 +357,11 @@ export default function Home() {
 
       const data = (await response.json()) as ScoreResult;
       setResult(data);
+      window.requestAnimationFrame(() => {
+        document
+          .getElementById("results")
+          ?.scrollIntoView({ behavior: "smooth" });
+      });
     } catch {
       setError("Something went wrong while scoring the page.");
     } finally {
@@ -438,10 +443,17 @@ export default function Home() {
       <section className="hero">
         <div>
           <span className="eyebrow">Local SEO dashboard</span>
-          <h1>Score service pages and turn gaps into clear SEO tasks.</h1>
+          <h1>
+            Score local service pages and turn gaps into clear, actionable SEO
+            tasks.
+          </h1>
           <p>
-            Fetch a page, review the extracted content, then export practical
-            reports for developers or AI assistants.
+            Fetch a page, analyse real content, and export tasks your developer
+            or AI can execute.
+          </p>
+          <p className="credibility-line">
+            Built for local SEO pages, service businesses, and real-world
+            ranking improvements.
           </p>
         </div>
       </section>
@@ -453,7 +465,7 @@ export default function Home() {
             <h2>Score a local service page</h2>
           </div>
           <button
-            className="secondary-button"
+            className="outline-button"
             onClick={loadExample}
             type="button"
           >
@@ -516,8 +528,16 @@ export default function Home() {
                 {isFetching ? "Fetching..." : "Fetch URL"}
               </button>
             </span>
+            <span className="helper-text">
+              Tip: Use a real service page URL for best results.
+            </span>
           </label>
         </div>
+
+        <p className="form-tip">
+          Use a live service page URL, then review the extracted content before
+          scoring.
+        </p>
 
         <label>
           Meta description
@@ -601,10 +621,10 @@ export default function Home() {
 
           <section className="export-panel card" id="exports">
             <div>
-              <span className="eyebrow">Export Reports</span>
-              <h2>Share clear next steps</h2>
+              <span className="eyebrow">Reports</span>
+              <h2>Export Reports</h2>
               <p>
-                Download a developer task sheet or a controlled AI task pack.
+                Download a developer-ready report or a controlled AI task pack.
               </p>
             </div>
             <div className="result-actions">
