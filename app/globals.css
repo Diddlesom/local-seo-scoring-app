@@ -22,6 +22,7 @@ body {
 
 button,
 input,
+select,
 textarea {
   font: inherit;
 }
@@ -207,6 +208,63 @@ nav a:hover {
   gap: 18px;
   margin-top: 24px;
   padding: 24px;
+}
+
+.case-study-panel {
+  display: grid;
+  gap: 18px;
+  margin-top: 24px;
+  padding: 24px;
+}
+
+.case-study-panel .card-heading p {
+  color: #607166;
+  line-height: 1.5;
+  margin: 8px 0 0;
+  max-width: 720px;
+}
+
+.case-study-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.case-study-output {
+  display: grid;
+  gap: 16px;
+}
+
+.case-study-output > div {
+  background: #f8fcf9;
+  border: 1px solid #e1ede4;
+  border-radius: 16px;
+  padding: 16px;
+}
+
+.case-study-output p {
+  color: #273b30;
+  line-height: 1.55;
+  margin: 0;
+}
+
+.case-study-output pre {
+  background: #102019;
+  border-radius: 12px;
+  color: #f8fcf9;
+  font-size: 13px;
+  line-height: 1.5;
+  margin: 0;
+  overflow-x: auto;
+  padding: 14px;
+  white-space: pre-wrap;
+}
+
+.warning-output {
+  background: #fffdf6;
+  border: 1px solid #eadfbf;
+  border-radius: 16px;
+  padding: 16px;
 }
 
 .benchmark-panel .card-heading p {
@@ -485,6 +543,7 @@ label {
 }
 
 input,
+select,
 textarea {
   background: #fbfdfb;
   border: 1px solid #cbd9cd;
@@ -506,6 +565,7 @@ textarea {
 }
 
 input:focus,
+select:focus,
 textarea:focus {
   background: #ffffff;
   border-color: #22c55e;
@@ -974,7 +1034,7 @@ li {
 
   nav {
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(5, minmax(0, 1fr));
   }
 
   nav a {
@@ -982,6 +1042,7 @@ li {
   }
 
   .form-grid,
+  .case-study-grid,
   .competitor-grid,
   .benchmark-results,
   .combined-insights,
@@ -1023,6 +1084,7 @@ li {
   }
 
   .score-form,
+  .case-study-panel,
   .panel,
   .export-panel,
   .score-summary {

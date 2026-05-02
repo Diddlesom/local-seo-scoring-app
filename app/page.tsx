@@ -76,6 +76,15 @@ type BenchmarkResult = BenchmarkCompetitor & {
   error?: string;
 };
 
+type CaseStudyState = {
+  location: string;
+  deviceType: string;
+  problem: string;
+  fixCompleted: string;
+  turnaroundTime: string;
+  permissionConfirmed: "no" | "yes";
+};
+
 const initialFormState: FormState = {
   keyword: "",
   location: "",
@@ -94,6 +103,15 @@ const initialFormState: FormState = {
     faqItems: [],
     relatedInternalLinks: []
   }
+};
+
+const initialCaseStudyState: CaseStudyState = {
+  location: "",
+  deviceType: "",
+  problem: "",
+  fixCompleted: "",
+  turnaroundTime: "",
+  permissionConfirmed: "no"
 };
 
 const exampleFormState: FormState = {
@@ -306,7 +324,7 @@ function simplifyBenchmarkGap(gap: string): string {
   const cleanGap = gap.toLowerCase();
 
   if (cleanGap.includes("deeper page content")) {
-    return "Content depth below competitors";
+    return "One competitor has deeper content";
   }
 
   if (cleanGap.includes("more headings")) {
@@ -478,6 +496,11 @@ function buildBenchmarkInsights({
     competitors
       .flatMap((competitor) => competitor.gapsFound)
       .map(simplifyBenchmarkGap)
+      .filter(
+        (gap) =>
+          targetResult.signals.wordCount < averageWordCount ||
+          gap !== "One competitor has deeper content"
+      )
   ).slice(0, 8);
   const missingMajorityTopics = majorityTopics
     .filter((topic) => !targetTopics.includes(topic.value))
@@ -527,11 +550,14 @@ function buildBenchmarkInsights({
         ? `Your page is weaker than competitors in ${belowAverageAreas.join(" and ")}.`
         : `Your page is competitive in ${competitiveAreas.join(" and ")}.`;
   const priorityActionGroups: BenchmarkInsights["priorityActionGroups"] = {
-    contentDepth: [
-      `Your page: ${targetResult.signals.wordCount} words`,
-      `Competitor average: ${averageWordCount} words`,
-      "Add more service detail and local relevance"
-    ],
+    contentDepth:
+      targetResult.signals.wordCount < averageWordCount
+        ? [
+            `Your page: ${targetResult.signals.wordCount} words`,
+            `Competitor average: ${averageWordCount} words`,
+            "Add more service detail and local relevance"
+          ]
+        : [],
     trustSignals: [
       "Add testimonials (used by competitors)",
       "Add customer-style review wording",
@@ -576,7 +602,7 @@ function buildBenchmarkInsights({
       contentDepth:
         contentGap > 0
           ? "Below competitor average."
-          : "Competitive with competitor average.",
+          : "Content depth is above competitor average.",
       trustSignals:
         trustGap > 0
           ? "Below competitor average."
@@ -871,16 +897,18 @@ function BenchmarkInsightsPanel({
           the top action first for the fastest impact.
         </p>
         <ol className="benchmark-action-groups">
-          {actionGroups.map(([label, actions]) => (
-            <li key={label}>
-              <strong>{label}</strong>
-              <ul>
-                {actions.map((action) => (
-                  <li key={action}>{action}</li>
-                ))}
-              </ul>
-            </li>
-          ))}
+          {actionGroups.map(([label, actions]) =>
+            actions.length > 0 ? (
+              <li key={label}>
+                <strong>{label}</strong>
+                <ul>
+                  {actions.map((action) => (
+                    <li key={action}>{action}</li>
+                  ))}
+                </ul>
+              </li>
+            ) : null
+          )}
         </ol>
       </section>
 
@@ -920,6 +948,99 @@ function BenchmarkInsightsPanel({
           </table>
         </div>
       </section>
+    </div>
+  );
+}
+
+function getMissingCaseStudyFields(caseStudy: CaseStudyState): string[] {
+  const missingFields: string[] = [];
+
+  if (!caseStudy.location.trim()) {
+    missingFields.push("location / street / area");
+  }
+
+  if (!caseStudy.deviceType.trim()) {
+    missingFields.push("device type");
+  }
+
+  if (!caseStudy.problem.trim()) {
+    missingFields.push("problem");
+  }
+
+  if (!caseStudy.fixCompleted.trim()) {
+    missingFields.push("fix completed");
+  }
+
+  if (!caseStudy.turnaroundTime.trim()) {
+    missingFields.push("turnaround time");
+  }
+
+  return missingFields;
+}
+
+function createCaseStudyText(caseStudy: CaseStudyState): string {
+  const areaParts = caseStudy.location.split(",").map((part) => part.trim());
+  const caseStudyArea = areaParts[areaParts.length - 1] || caseStudy.location;
+
+  return `Recent ${caseStudyArea} repair example: A customer in ${caseStudy.location} had a ${caseStudy.deviceType} that ${caseStudy.problem}. We ${caseStudy.fixCompleted}. The device was returned ${caseStudy.turnaroundTime} fully working.`;
+}
+
+function createCaseStudyHtml(caseStudyText: string): string {
+  return `<section>
+  <h2>Recent local repair example</h2>
+  <p>${caseStudyText}</p>
+</section>`;
+}
+
+function CaseStudyOutput({ caseStudy }: { caseStudy: CaseStudyState }) {
+  const missingFields = getMissingCaseStudyFields(caseStudy);
+
+  if (caseStudy.permissionConfirmed !== "yes") {
+    return (
+      <div className="case-study-output warning-output">
+        <h3>Case study not ready to publish</h3>
+        <p>
+          Permission has not been confirmed. Do not generate publish-ready copy
+          until the business owner confirms the details and permission to use the
+          example.
+        </p>
+      </div>
+    );
+  }
+
+  if (missingFields.length > 0) {
+    return (
+      <div className="case-study-output warning-output">
+        <h3>More confirmed facts needed</h3>
+        <p>Business owner must confirm: {missingFields.join(", ")}.</p>
+      </div>
+    );
+  }
+
+  const caseStudyText = createCaseStudyText(caseStudy);
+  const htmlVersion = createCaseStudyHtml(caseStudyText);
+
+  return (
+    <div className="case-study-output">
+      <div>
+        <h3>Short case study paragraph</h3>
+        <p>{caseStudyText}</p>
+      </div>
+
+      <div>
+        <h3>HTML version</h3>
+        <pre>{htmlVersion}</pre>
+      </div>
+
+      <div>
+        <h3>Developer Report version</h3>
+        <pre>{`Add this confirmed local proof section:\n\n${caseStudyText}`}</pre>
+      </div>
+
+      <div>
+        <h3>AI Task Pack version</h3>
+        <pre>{`Task: Add confirmed local case study proof.\n\nUse this exact confirmed copy:\n${caseStudyText}\n\nDo not invent customer names, reviews, locations, devices, problems, fixes, or turnaround times.`}</pre>
+      </div>
     </div>
   );
 }
@@ -966,6 +1087,9 @@ export default function Home() {
   const [benchmarkResults, setBenchmarkResults] = useState<BenchmarkResult[]>(
     []
   );
+  const [caseStudy, setCaseStudy] = useState<CaseStudyState>(
+    initialCaseStudyState
+  );
   const [isFetching, setIsFetching] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isBenchmarking, setIsBenchmarking] = useState(false);
@@ -993,6 +1117,16 @@ export default function Home() {
     setCompetitorUrls((current) =>
       current.map((url, urlIndex) => (urlIndex === index ? value : url))
     );
+  }
+
+  function updateCaseStudyField(
+    field: keyof CaseStudyState,
+    value: string
+  ) {
+    setCaseStudy((current) => ({
+      ...current,
+      [field]: value
+    }));
   }
 
   async function handleFetchUrl() {
@@ -1334,6 +1468,7 @@ export default function Home() {
         <nav aria-label="Dashboard navigation">
           <a href="#score-page">Score Page</a>
           <a href="#benchmark">Benchmark</a>
+          <a href="#case-study">Case Study</a>
           <a href="#results">Results</a>
           <a href="#exports">Exports</a>
         </nav>
@@ -1589,6 +1724,105 @@ export default function Home() {
             ))}
           </div>
         ) : null}
+      </section>
+
+      <section className="case-study-panel card" id="case-study">
+        <div className="card-heading">
+          <div>
+            <span className="eyebrow">Case Study Generator</span>
+            <h2>Create safe local proof content</h2>
+            <p>
+              Use only confirmed business-owner facts. Do not invent customer
+              names, reviews, locations, devices, problems, fixes, or turnaround
+              times.
+            </p>
+          </div>
+        </div>
+
+        <div className="case-study-grid">
+          <label>
+            Location / street / area
+            <input
+              onChange={(event) =>
+                updateCaseStudyField("location", event.target.value)
+              }
+              placeholder="Barn Close, Crewkerne"
+              type="text"
+              value={caseStudy.location}
+            />
+          </label>
+
+          <label>
+            Device type
+            <input
+              onChange={(event) =>
+                updateCaseStudyField("deviceType", event.target.value)
+              }
+              placeholder="Dell laptop"
+              type="text"
+              value={caseStudy.deviceType}
+            />
+          </label>
+
+          <label>
+            Problem
+            <input
+              onChange={(event) =>
+                updateCaseStudyField("problem", event.target.value)
+              }
+              placeholder="would not boot"
+              type="text"
+              value={caseStudy.problem}
+            />
+          </label>
+
+          <label>
+            Fix completed
+            <input
+              onChange={(event) =>
+                updateCaseStudyField("fixCompleted", event.target.value)
+              }
+              placeholder="safely backed up the hard drive, replaced it with a faster SSD, and restored all their files"
+              type="text"
+              value={caseStudy.fixCompleted}
+            />
+          </label>
+
+          <label>
+            Turnaround time
+            <input
+              onChange={(event) =>
+                updateCaseStudyField("turnaroundTime", event.target.value)
+              }
+              placeholder="the next day"
+              type="text"
+              value={caseStudy.turnaroundTime}
+            />
+          </label>
+
+          <label>
+            Permission confirmed
+            <select
+              onChange={(event) =>
+                updateCaseStudyField(
+                  "permissionConfirmed",
+                  event.target.value
+                )
+              }
+              value={caseStudy.permissionConfirmed}
+            >
+              <option value="no">No</option>
+              <option value="yes">Yes</option>
+            </select>
+          </label>
+        </div>
+
+        <p className="form-tip">
+          Safety rule: Do not invent customer names, reviews, locations,
+          devices, problems, fixes, or turnaround times.
+        </p>
+
+        <CaseStudyOutput caseStudy={caseStudy} />
       </section>
 
       {result ? (

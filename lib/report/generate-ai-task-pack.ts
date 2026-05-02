@@ -138,15 +138,9 @@ function slugToWords(url: string): string {
 }
 
 function extractDestinationTopics(link: { text: string; url: string }): string[] {
-  const slugTopics = serviceTopics.filter((topic) =>
+  return serviceTopics.filter((topic) =>
     slugToWords(link.url).toLowerCase().includes(topic)
   );
-
-  if (slugTopics.length > 0) {
-    return slugTopics;
-  }
-
-  return serviceTopics.filter((topic) => link.text.toLowerCase().includes(topic));
 }
 
 function extractAnchorTopics(text: string): string[] {
@@ -207,6 +201,21 @@ function getInternalLinkRecommendations(
           pageType,
           reason:
             "Medium confidence: topic is related, but this is not a dedicated service page.",
+          text: link.text,
+          topic: displayTopic,
+          url: link.url
+        };
+      }
+
+      if (
+        anchorTopics.length > 0 &&
+        pageType === "location_page" &&
+        topicMatches(anchorTopics, destinationTopics)
+      ) {
+        return {
+          confidence: "medium",
+          pageType,
+          reason: "Topical match, but location may be less ideal.",
           text: link.text,
           topic: displayTopic,
           url: link.url
@@ -306,7 +315,7 @@ function simplifyBenchmarkGap(gap: string): string {
   const cleanGap = gap.toLowerCase();
 
   if (cleanGap.includes("deeper page content")) {
-    return "Content depth below competitors";
+    return "One competitor has deeper content";
   }
 
   if (cleanGap.includes("more headings")) {
@@ -444,7 +453,9 @@ function getCodeOrContent(action: PrioritizedAction, page: ReportPageDetails): s
   }
 
   if (cleanAction.includes("meta wording")) {
-    return "Need computer repair in Ilminster? Get fast, reliable laptop, PC and Mac repairs from Dave at CWC Computers. Call today for friendly local advice.";
+    const location = page.location ? cleanText(page.location) : "[target location]";
+
+    return `Need computer repair in ${location}? Get fast, reliable laptop, PC and Mac repairs from Dave at CWC Computers. Call today for friendly local advice.`;
   }
 
   return "No copy-paste content available. Create the smallest practical WordPress change needed for this task.";
@@ -641,27 +652,51 @@ function formatBenchmarkInsightsContext(
 }
 
 function formatBenchmarkActionGroups(insights: BenchmarkInsights): string[] {
-  return [
-    "1. Increase content depth",
-    `- Your page: ${insights.targetWordCount} words`,
-    `- Competitor average: ${insights.averageWordCount} words`,
-    "- Add more service detail and local relevance",
-    "",
-    "2. Improve trust signals",
-    "- Add testimonials (used by competitors)",
-    "- Add customer-style review wording",
-    "- Add independent business messaging",
-    "- Add family-run or guarantee messaging if accurate",
-    "",
-    "3. Expand service coverage",
-    "- Add a computer repair section",
-    "- Add a pc repair section",
-    "- Consider mac repair and SSD upgrade if relevant",
-    "",
-    "4. Improve page structure",
-    "- Add more service subheadings",
-    "- Break content into clearer sections"
-  ];
+  const groups: Array<{ title: string; items: string[] }> = [];
+
+  if (insights.targetWordCount < insights.averageWordCount) {
+    groups.push({
+      title: "Increase content depth",
+      items: [
+        `Your page: ${insights.targetWordCount} words`,
+        `Competitor average: ${insights.averageWordCount} words`,
+        "Add more service detail and local relevance"
+      ]
+    });
+  }
+
+  groups.push(
+    {
+      title: "Improve trust signals",
+      items: [
+        "Add testimonials (used by competitors)",
+        "Add customer-style review wording",
+        "Add independent business messaging",
+        "Add family-run or guarantee messaging if accurate"
+      ]
+    },
+    {
+      title: "Expand service coverage",
+      items: [
+        "Add a computer repair section",
+        "Add a pc repair section",
+        "Consider mac repair and SSD upgrade if relevant"
+      ]
+    },
+    {
+      title: "Improve page structure",
+      items: [
+        "Add more service subheadings",
+        "Break content into clearer sections"
+      ]
+    }
+  );
+
+  return groups.flatMap((group, index) => [
+    `${index + 1}. ${group.title}`,
+    ...group.items.map((item) => `- ${item}`),
+    ""
+  ]);
 }
 
 export function generateAiTaskPack({

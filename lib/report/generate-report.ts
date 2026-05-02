@@ -230,15 +230,9 @@ function slugToWords(url: string): string {
 }
 
 function extractDestinationTopics(link: { text: string; url: string }): string[] {
-  const slugTopics = serviceTopics.filter((topic) =>
+  return serviceTopics.filter((topic) =>
     slugToWords(link.url).toLowerCase().includes(topic)
   );
-
-  if (slugTopics.length > 0) {
-    return slugTopics;
-  }
-
-  return serviceTopics.filter((topic) => link.text.toLowerCase().includes(topic));
 }
 
 function extractAnchorTopics(text: string): string[] {
@@ -300,6 +294,21 @@ function getInternalLinkRecommendations(
           pageType,
           reason:
             "Medium confidence: topic is related, but this is not a dedicated service page.",
+          text: link.text,
+          topic: displayTopic,
+          url: link.url
+        };
+      }
+
+      if (
+        anchorTopics.length > 0 &&
+        pageType === "location_page" &&
+        topicMatches(anchorTopics, destinationTopics)
+      ) {
+        return {
+          confidence: "medium",
+          pageType,
+          reason: "Topical match, but location may be less ideal.",
           text: link.text,
           topic: displayTopic,
           url: link.url
@@ -446,7 +455,7 @@ function simplifyBenchmarkGap(gap: string): string {
   const cleanGap = gap.toLowerCase();
 
   if (cleanGap.includes("deeper page content")) {
-    return "Content depth below competitors";
+    return "One competitor has deeper content";
   }
 
   if (cleanGap.includes("more headings")) {
@@ -516,27 +525,54 @@ function formatBenchmark(benchmark?: BenchmarkCompetitor[]): string {
 }
 
 function formatBenchmarkActionGroups(insights: BenchmarkInsights): string {
-  return [
-    "1. Increase content depth",
-    `- Your page: ${insights.targetWordCount} words`,
-    `- Competitor average: ${insights.averageWordCount} words`,
-    "- Add more service detail and local relevance",
-    "",
-    "2. Improve trust signals",
-    "- Add testimonials (used by competitors)",
-    "- Add customer-style review wording",
-    "- Add independent business messaging",
-    "- Add family-run or guarantee messaging if accurate",
-    "",
-    "3. Expand service coverage",
-    "- Add a computer repair section",
-    "- Add a pc repair section",
-    "- Consider mac repair and SSD upgrade if relevant",
-    "",
-    "4. Improve page structure",
-    "- Add more service subheadings",
-    "- Break content into clearer sections"
-  ].join("\n");
+  const groups: Array<{ title: string; items: string[] }> = [];
+
+  if (insights.targetWordCount < insights.averageWordCount) {
+    groups.push({
+      title: "Increase content depth",
+      items: [
+        `Your page: ${insights.targetWordCount} words`,
+        `Competitor average: ${insights.averageWordCount} words`,
+        "Add more service detail and local relevance"
+      ]
+    });
+  }
+
+  groups.push(
+    {
+      title: "Improve trust signals",
+      items: [
+        "Add testimonials (used by competitors)",
+        "Add customer-style review wording",
+        "Add independent business messaging",
+        "Add family-run or guarantee messaging if accurate"
+      ]
+    },
+    {
+      title: "Expand service coverage",
+      items: [
+        "Add a computer repair section",
+        "Add a pc repair section",
+        "Consider mac repair and SSD upgrade if relevant"
+      ]
+    },
+    {
+      title: "Improve page structure",
+      items: [
+        "Add more service subheadings",
+        "Break content into clearer sections"
+      ]
+    }
+  );
+
+  return groups
+    .map((group, index) =>
+      [
+        `${index + 1}. ${group.title}`,
+        ...group.items.map((item) => `- ${item}`)
+      ].join("\n")
+    )
+    .join("\n\n");
 }
 
 function formatBenchmarkInsights(insights?: BenchmarkInsights | null): string {
@@ -791,13 +827,15 @@ Recent ${location} repair example: A customer in [confirmed location] had [confi
   }
 
   if (cleanAction.includes("meta wording")) {
+    const location = getLocation(page);
+
     return {
       whereToImplement:
         "SEO title/meta plugin field or page metadata settings.",
       whatToChange:
         "Rewrite the meta description to include the service, location, benefit, and call to action.",
       example:
-        "Example meta description:\nNeed computer repair in Ilminster? Get fast, reliable laptop, PC and Mac repairs from Dave at CWC Computers. Call today for friendly local advice.",
+        `Example meta description:\nNeed computer repair in ${location}? Get fast, reliable laptop, PC and Mac repairs from Dave at CWC Computers. Call today for friendly local advice.`,
       expectedOutcome:
         "The search result snippet becomes clearer and more likely to earn clicks."
     };
