@@ -1,8 +1,17 @@
 import type { ExtractedSignals, ScoringInput } from "./types";
 import { scoringConfig } from "./config";
 
+const flexibleStopWords = new Set(["in", "near", "for", "the", "a", "an"]);
+
 function normalise(value?: string): string {
   return value?.trim().toLowerCase() ?? "";
+}
+
+function normaliseForMatching(value?: string): string {
+  return normalise(value)
+    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function stripHtml(html: string): string {
@@ -45,8 +54,47 @@ function normaliseHeadings(
 }
 
 function includesPhrase(text: string, phrase?: string): boolean {
-  const cleanPhrase = normalise(phrase);
-  return cleanPhrase.length > 0 && normalise(text).includes(cleanPhrase);
+  const phraseTokens = normaliseForMatching(phrase)
+    .split(" ")
+    .filter(Boolean);
+  const textTokens = normaliseForMatching(text).split(" ").filter(Boolean);
+
+  if (phraseTokens.length === 0 || textTokens.length === 0) {
+    return false;
+  }
+
+  for (let startIndex = 0; startIndex < textTokens.length; startIndex += 1) {
+    let phraseIndex = 0;
+    let textIndex = startIndex;
+
+    while (phraseIndex < phraseTokens.length && textIndex < textTokens.length) {
+      if (textTokens[textIndex] === phraseTokens[phraseIndex]) {
+        phraseIndex += 1;
+        textIndex += 1;
+        continue;
+      }
+
+      const previousMatched = phraseIndex > 0;
+      const nextPhraseWord = phraseIndex < phraseTokens.length;
+
+      if (
+        previousMatched &&
+        nextPhraseWord &&
+        flexibleStopWords.has(textTokens[textIndex])
+      ) {
+        textIndex += 1;
+        continue;
+      }
+
+      break;
+    }
+
+    if (phraseIndex === phraseTokens.length) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 function countPhrase(text: string, phrase?: string): number {
