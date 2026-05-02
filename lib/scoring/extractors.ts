@@ -116,6 +116,88 @@ function findMatches(text: string, words: readonly string[]): string[] {
   return words.filter((word) => cleanText.includes(word.toLowerCase()));
 }
 
+function findTrustSignals(text: string): string[] {
+  const cleanText = normalise(text);
+  const signals = new Set<string>();
+
+  if (
+    /\b\d+(?:\.\d)?\s*(?:star|\/5)\b/i.test(text) ||
+    /⭐|★/.test(text) ||
+    /\b(?:google\s+)?reviews?\b/i.test(text) ||
+    /\b\d+\s+reviews?\b/i.test(text)
+  ) {
+    signals.add("Reviews or rating proof");
+  }
+
+  if (/\b(?:i'?m|i am)\s+[A-Z][a-z]+\b/.test(text)) {
+    signals.add("Named person");
+  }
+
+  if (/\b(?:technician|engineer|owner)\b/i.test(text)) {
+    signals.add("Technician, engineer, or owner mentioned");
+  }
+
+  if (/\bdave\b/i.test(text)) {
+    signals.add("Named technician");
+  }
+
+  if (cleanText.includes("no fix no fee")) {
+    signals.add("No fix no fee");
+  }
+
+  if (cleanText.includes("warranty")) {
+    signals.add("Warranty");
+  }
+
+  if (cleanText.includes("guarantee")) {
+    signals.add("Guarantee");
+  }
+
+  if (
+    cleanText.includes("no call-out fee") ||
+    cleanText.includes("no call out fee")
+  ) {
+    signals.add("No call-out fee");
+  }
+
+  if (cleanText.includes("free diagnostics")) {
+    signals.add("Free diagnostics");
+  }
+
+  if (/\bsince\s+\d{4}\b/i.test(text)) {
+    signals.add("Established history");
+  }
+
+  if (
+    /\byears?\s+experience\b/i.test(text) ||
+    /\bover\s+\d+\s+years?\b/i.test(text)
+  ) {
+    signals.add("Experience stated");
+  }
+
+  if (/[“"][^”"]{20,}[”"]/.test(text) || /\btestimonial(s)?\b/i.test(text)) {
+    signals.add("Testimonials");
+  }
+
+  if (/\b[A-Z][a-z]+\s+(?:said|says|reviewed|recommends?)\b/.test(text)) {
+    signals.add("Customer-style review wording");
+  }
+
+  if (/\blocal\b/i.test(text)) {
+    signals.add("Local business identity");
+  }
+
+  if (/\bfamily[- ]run\b/i.test(text)) {
+    signals.add("Family-run business");
+  }
+
+  if (/\bindependent\b/i.test(text)) {
+    signals.add("Independent business");
+  }
+
+  return Array.from(signals);
+}
+
 function findSchemaTypes(schemaSource: string): string[] {
   return scoringConfig.schemaTypes.filter((type) =>
     new RegExp(`"@type"\\s*:\\s*"[^"]*${type}[^"]*"`, "i").test(
@@ -130,7 +212,7 @@ export function extractSignals(input: ScoringInput): ExtractedSignals {
   const pageText = input.text ?? stripHtml(html);
   const title = input.title ?? "";
   const metaDescription = input.metaDescription ?? "";
-  const trustSignals = findMatches(pageText, scoringConfig.trustSignalWords);
+  const trustSignals = findTrustSignals(pageText);
   const ctaWords = findMatches(pageText, scoringConfig.ctaWords);
   const schemaTypes = findSchemaTypes(schemaSource);
   const locationMentionCount = countPhrase(pageText, input.location);

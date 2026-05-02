@@ -41,7 +41,7 @@ function createCategoryScores(
     localSignals:
       (signals.locationMentionCount > 0 ? 8 : 0) +
       (signals.hasPhoneNumber ? 7 : 0),
-    trust: Math.min(signals.trustSignals.length * 3, 10),
+    trust: Math.min(signals.trustSignals.length * 2, 10),
     conversion: Math.min(signals.ctaWords.length * 3, 10),
     schema: Math.min(signals.schemaTypes.length * 5, 15)
   };
@@ -74,7 +74,9 @@ function createStrengths(
   }
 
   if (signals.trustSignals.length > 0) {
-    strengths.push("Page includes basic trust signals.");
+    strengths.push(
+      `Page includes trust signals: ${signals.trustSignals.join(", ")}.`
+    );
   }
 
   if (signals.ctaWords.length > 0) {
