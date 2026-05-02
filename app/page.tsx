@@ -125,20 +125,28 @@ export default function Home() {
           url: form.websiteUrl
         })
       });
-      const data = (await response.json()) as
-        | FetchedPageData
-        | { error?: string };
+      const data = (await response.json()) as unknown;
 
-      if (!response.ok || "error" in data) {
-        throw new Error(data.error ?? "The page could not be fetched.");
+      if (!response.ok) {
+        const errorMessage =
+          typeof data === "object" &&
+          data !== null &&
+          "error" in data &&
+          typeof data.error === "string"
+            ? data.error
+            : "The page could not be fetched.";
+
+        throw new Error(errorMessage);
       }
+
+      const pageData = data as FetchedPageData;
 
       setForm((current) => ({
         ...current,
-        title: data.title,
-        metaDescription: data.metaDescription,
-        pageContent: data.html || data.bodyText,
-        schemaJson: data.schemaJson
+        title: pageData.title,
+        metaDescription: pageData.metaDescription,
+        pageContent: pageData.html || pageData.bodyText,
+        schemaJson: pageData.schemaJson
       }));
       setFetchMessage("URL fetched. Review the fields, then score the page.");
     } catch (fetchError) {
