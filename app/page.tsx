@@ -149,6 +149,26 @@ function ResultList({ items }: { items: string[] }) {
   );
 }
 
+function getScoreStatus(totalScore: number): string {
+  if (totalScore >= 90) {
+    return "Strong optimisation level.";
+  }
+
+  if (totalScore >= 70) {
+    return "Moderate optimisation level. Improvements available.";
+  }
+
+  return "Weak optimisation level. Prioritise key fixes.";
+}
+
+function formatIssueText(issue: string): string {
+  if (issue.toLowerCase().includes("page content is thin")) {
+    return "Low content depth detected. Add more service detail to improve rankings.";
+  }
+
+  return issue;
+}
+
 function TopIssues({ result }: { result: ScoreResult }) {
   const issues =
     result.weaknesses.length > 0
@@ -170,7 +190,7 @@ function TopIssues({ result }: { result: ScoreResult }) {
       {issues.length > 0 ? (
         <ul>
           {issues.map((issue) => (
-            <li key={issue}>{issue}</li>
+            <li key={issue}>{formatIssueText(issue)}</li>
           ))}
         </ul>
       ) : (
@@ -179,6 +199,10 @@ function TopIssues({ result }: { result: ScoreResult }) {
           improvements.
         </p>
       )}
+      <p className="why-this-matters">
+        Why this matters: Pages with stronger content depth, trust signals, and
+        internal linking tend to perform better for local service searches.
+      </p>
     </section>
   );
 }
@@ -196,10 +220,11 @@ function CategoryScoreBar({
   return (
     <div className="score-bar-row">
       <div className="score-bar-label">
-        <span>
-          {categoryLabels[category]} — {score}
-        </span>
-        <strong>of {maxScore}</strong>
+        <span>{categoryLabels[category]}</span>
+        <strong>
+          {score}
+          <small> / {maxScore}</small>
+        </strong>
       </div>
       <div
         aria-label={`${categoryLabels[category]} score ${score} out of ${maxScore}`}
@@ -639,6 +664,7 @@ export default function Home() {
               <span className="summary-label">Total score</span>
               <strong>{result.totalScore}</strong>
               <span>/100</span>
+              <p>{getScoreStatus(result.totalScore)}</p>
             </div>
             <div className="grade-card">
               <span className="summary-label">Grade</span>
@@ -683,7 +709,7 @@ export default function Home() {
                 Export Developer Report
               </button>
               <button
-                className="secondary-button"
+                className="primary-button export-primary"
                 onClick={exportAiTaskPack}
                 type="button"
               >
