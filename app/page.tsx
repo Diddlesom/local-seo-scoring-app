@@ -163,7 +163,13 @@ function getScoreStatus(totalScore: number): string {
 
 function formatIssueText(issue: string): string {
   if (issue.toLowerCase().includes("page content is thin")) {
-    return "Low content depth detected. Add more service detail to improve rankings.";
+    return "⚠️ Low content depth detected. Expand service sections and add more local detail to improve rankings.";
+  }
+
+  if (
+    issue === "Low content depth detected. Add more service detail to improve rankings."
+  ) {
+    return "⚠️ Low content depth detected. Expand service sections and add more local detail to improve rankings.";
   }
 
   return issue;
@@ -203,6 +209,9 @@ function TopIssues({ result }: { result: ScoreResult }) {
         Why this matters: Pages with stronger content depth, trust signals, and
         internal linking tend to perform better for local service searches.
       </p>
+      <a className="guided-link" href="#recommended-actions">
+        View recommended fixes →
+      </a>
     </section>
   );
 }
@@ -661,7 +670,7 @@ export default function Home() {
 
           <div className="score-summary card">
             <div className="score-main">
-              <span className="summary-label">Total score</span>
+              <span className="summary-label">Performance Score</span>
               <strong>{result.totalScore}</strong>
               <span>/100</span>
               <p>{getScoreStatus(result.totalScore)}</p>
@@ -718,7 +727,7 @@ export default function Home() {
             </div>
           </section>
 
-          <section className="panel card">
+          <section className="panel card" id="recommended-actions">
             <div className="card-heading">
               <div>
                 <span className="eyebrow">Next actions</span>

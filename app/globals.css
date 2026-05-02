@@ -175,10 +175,10 @@ nav a:hover {
 }
 
 .eyebrow {
-  color: #17633f;
+  color: #5f7b68;
   font-size: 12px;
   font-weight: 900;
-  letter-spacing: 0.08em;
+  letter-spacing: 1px;
   text-transform: uppercase;
 }
 
@@ -457,19 +457,39 @@ button:disabled {
 }
 
 .why-this-matters {
-  background: rgba(22, 101, 52, 0.06);
-  border: 1px solid rgba(22, 101, 52, 0.14);
+  background: #f8f9fa;
+  border: 1px solid #edf0ee;
   border-radius: 14px;
-  color: #294434;
+  color: #6c757d;
   font-size: 14px;
   font-weight: 750;
   padding: 12px 14px;
 }
 
+.guided-link {
+  color: #166534;
+  font-size: 14px;
+  font-weight: 900;
+  width: fit-content;
+}
+
+.guided-link:hover {
+  color: #0f5130;
+  text-decoration: underline;
+}
+
 .results {
   display: grid;
-  gap: 20px;
+  gap: 0;
   margin-top: 24px;
+}
+
+.results > * {
+  margin-bottom: 32px;
+}
+
+.results > *:last-child {
+  margin-bottom: 0;
 }
 
 .score-summary {
@@ -478,7 +498,9 @@ button:disabled {
     radial-gradient(circle at 18% 0%, rgba(34, 197, 94, 0.4), transparent 34%),
     linear-gradient(135deg, rgba(22, 101, 52, 0.99), rgba(5, 46, 30, 0.99)),
     #166534;
-  box-shadow: 0 30px 90px rgba(7, 45, 30, 0.2);
+  box-shadow:
+    0 10px 30px rgba(0, 0, 0, 0.15),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
   color: #ffffff;
   display: grid;
   gap: 18px;
@@ -513,10 +535,10 @@ button:disabled {
 
 .grade-card {
   align-content: center;
-  background: rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 16px;
   justify-items: center;
   padding: 20px;
 }
@@ -585,6 +607,7 @@ button:disabled {
   border-radius: inherit;
   display: block;
   height: 100%;
+  transition: width 0.6s ease;
 }
 
 .export-panel {
