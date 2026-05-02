@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { FormEvent } from "react";
 import { generateAiTaskPack } from "../lib/report/generate-ai-task-pack";
 import { generateDeveloperReport } from "../lib/report/generate-report";
+import { scoringConfig } from "../lib/scoring/config";
 import type { ScoreResult } from "../lib/scoring/types";
 
 type FetchedPageData = {
@@ -131,6 +132,9 @@ const categoryLabels: Record<keyof ScoreResult["categoryScores"], string> = {
   schema: "Schema"
 };
 
+const logoUrl =
+  "https://cwccomputerrepairchard.com/wp-content/uploads/2024/02/CWC-Logo-image-1-e1777727757742.png";
+
 function ResultList({ items }: { items: string[] }) {
   if (items.length === 0) {
     return <p className="empty">Nothing found yet.</p>;
@@ -142,6 +146,38 @@ function ResultList({ items }: { items: string[] }) {
         <li key={item}>{item}</li>
       ))}
     </ul>
+  );
+}
+
+function CategoryScoreBar({
+  category,
+  score
+}: {
+  category: keyof ScoreResult["categoryScores"];
+  score: number;
+}) {
+  const maxScore = scoringConfig.categoryWeights[category];
+  const percentage = Math.min(Math.round((score / maxScore) * 100), 100);
+
+  return (
+    <div className="score-bar-row">
+      <div className="score-bar-label">
+        <span>{categoryLabels[category]}</span>
+        <strong>
+          {score}/{maxScore}
+        </strong>
+      </div>
+      <div
+        aria-label={`${categoryLabels[category]} score ${score} out of ${maxScore}`}
+        className="score-bar-track"
+        role="progressbar"
+        aria-valuemin={0}
+        aria-valuemax={maxScore}
+        aria-valuenow={score}
+      >
+        <span style={{ width: `${percentage}%` }} />
+      </div>
+    </div>
   );
 }
 
@@ -211,6 +247,7 @@ export default function Home() {
   const [fetchMessage, setFetchMessage] = useState("");
   const [isFetching, setIsFetching] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [logoFailed, setLogoFailed] = useState(false);
 
   function updateField(field: TextFormField, value: string) {
     setForm((current) => ({
@@ -373,15 +410,57 @@ export default function Home() {
 
   return (
     <main className="page">
-      <header className="page-header">
-        <h1>Local SEO Scoring App</h1>
-        <p>
-          Paste the basics from one page, then score it for simple local SEO
-          coverage.
-        </p>
+      <header className="top-bar">
+        <div className="brand">
+          <div className="logo-mark">
+            {logoFailed ? (
+              <span>Local SEO</span>
+            ) : (
+              <img
+                alt="Local SEO Scoring App logo"
+                onError={() => setLogoFailed(true)}
+                src={logoUrl}
+              />
+            )}
+          </div>
+          <div>
+            <strong>Local SEO Scoring App</strong>
+            <span>Page scoring, schema checks, and AI-ready SEO tasks.</span>
+          </div>
+        </div>
+        <nav aria-label="Dashboard navigation">
+          <a href="#score-page">Score Page</a>
+          <a href="#results">Results</a>
+          <a href="#exports">Exports</a>
+        </nav>
       </header>
 
-      <form className="score-form" onSubmit={handleSubmit}>
+      <section className="hero">
+        <div>
+          <span className="eyebrow">Local SEO dashboard</span>
+          <h1>Score service pages and turn gaps into clear SEO tasks.</h1>
+          <p>
+            Fetch a page, review the extracted content, then export practical
+            reports for developers or AI assistants.
+          </p>
+        </div>
+      </section>
+
+      <form className="score-form card" id="score-page" onSubmit={handleSubmit}>
+        <div className="card-heading">
+          <div>
+            <span className="eyebrow">Page input</span>
+            <h2>Score a local service page</h2>
+          </div>
+          <button
+            className="secondary-button"
+            onClick={loadExample}
+            type="button"
+          >
+            Load Example
+          </button>
+        </div>
+
         <div className="form-grid">
           <label>
             Target keyword
@@ -429,7 +508,7 @@ export default function Home() {
                 value={form.websiteUrl}
               />
               <button
-                className="secondary-button"
+                className="fetch-button"
                 disabled={isFetching}
                 onClick={handleFetchUrl}
                 type="button"
@@ -462,6 +541,9 @@ export default function Home() {
             rows={10}
             value={form.pageContent}
           />
+          <span className="helper-text">
+            Fetched automatically from URL, but editable before scoring.
+          </span>
         </label>
 
         <label>
@@ -476,15 +558,8 @@ export default function Home() {
         </label>
 
         <div className="form-actions">
-          <button disabled={isLoading} type="submit">
+          <button className="primary-button" disabled={isLoading} type="submit">
             {isLoading ? "Scoring..." : "Score Page"}
-          </button>
-          <button
-            className="secondary-button"
-            onClick={loadExample}
-            type="button"
-          >
-            Load Example
           </button>
         </div>
 
@@ -493,43 +568,70 @@ export default function Home() {
       </form>
 
       {result ? (
-        <section className="results" aria-live="polite">
-          <div className="score-summary">
-            <div>
+        <section className="results" id="results" aria-live="polite">
+          <div className="score-summary card">
+            <div className="score-main">
               <span className="summary-label">Total score</span>
-              <strong>{result.totalScore}/100</strong>
+              <strong>{result.totalScore}</strong>
+              <span>/100</span>
             </div>
-            <div>
+            <div className="grade-card">
               <span className="summary-label">Grade</span>
               <strong>{result.grade}</strong>
             </div>
           </div>
 
-          <div className="result-actions">
-            <button onClick={exportDeveloperReport} type="button">
-              Export Developer Report
-            </button>
-            <button onClick={exportAiTaskPack} type="button">
-              Export AI Task Pack
-            </button>
-          </div>
-
-          <section className="panel">
-            <h2>Category Scores</h2>
+          <section className="panel card">
+            <div className="card-heading">
+              <div>
+                <span className="eyebrow">Scoring breakdown</span>
+                <h2>Category Scores</h2>
+              </div>
+            </div>
             <div className="score-list">
               {Object.entries(result.categoryScores).map(([key, score]) => (
-                <div className="score-row" key={key}>
-                  <span>
-                    {categoryLabels[key as keyof ScoreResult["categoryScores"]]}
-                  </span>
-                  <strong>{score}</strong>
-                </div>
+                <CategoryScoreBar
+                  category={key as keyof ScoreResult["categoryScores"]}
+                  key={key}
+                  score={score}
+                />
               ))}
             </div>
           </section>
 
-          <section className="panel">
-            <h2>Recommended Actions</h2>
+          <section className="export-panel card" id="exports">
+            <div>
+              <span className="eyebrow">Export Reports</span>
+              <h2>Share clear next steps</h2>
+              <p>
+                Download a developer task sheet or a controlled AI task pack.
+              </p>
+            </div>
+            <div className="result-actions">
+              <button
+                className="secondary-button"
+                onClick={exportDeveloperReport}
+                type="button"
+              >
+                Export Developer Report
+              </button>
+              <button
+                className="secondary-button"
+                onClick={exportAiTaskPack}
+                type="button"
+              >
+                Export AI Task Pack
+              </button>
+            </div>
+          </section>
+
+          <section className="panel card">
+            <div className="card-heading">
+              <div>
+                <span className="eyebrow">Next actions</span>
+                <h2>Recommended Actions</h2>
+              </div>
+            </div>
             <div className="recommendation-groups">
               <div>
                 <h3>High priority</h3>
@@ -556,22 +658,22 @@ export default function Home() {
           </section>
 
           <div className="result-grid">
-            <section className="panel">
+            <section className="panel card">
               <h2>Strengths</h2>
               <ResultList items={result.strengths} />
             </section>
 
-            <section className="panel">
+            <section className="panel card">
               <h2>Weaknesses</h2>
               <ResultList items={result.weaknesses} />
             </section>
 
-            <section className="panel">
+            <section className="panel card">
               <h2>Missing Items</h2>
               <ResultList items={result.missingItems} />
             </section>
 
-            <section className="panel">
+            <section className="panel card">
               <h2>Evidence Items</h2>
               <ResultList items={result.evidenceItems} />
             </section>
