@@ -14,20 +14,14 @@ type GenerateReportInput = {
 };
 
 const priorityLabels: Record<PrioritizedAction["priority"], string> = {
-  high: "HIGH PRIORITY",
-  medium: "MEDIUM PRIORITY",
-  low: "LOW PRIORITY"
+  high: "High priority",
+  medium: "Medium priority",
+  low: "Low priority"
 };
 
-const categoryLabels: Record<keyof ScoreResult["categoryScores"], string> = {
-  content: "Content",
-  headings: "Headings",
-  metadata: "Metadata",
-  localSignals: "Local signals",
-  trust: "Trust",
-  conversion: "Conversion",
-  schema: "Schema"
-};
+function getLocation(page: ReportPageDetails): string {
+  return page.location || "[target location]";
+}
 
 function listItems(items: string[]): string {
   if (items.length === 0) {
@@ -37,85 +31,231 @@ function listItems(items: string[]): string {
   return items.map((item) => `- ${item}`).join("\n");
 }
 
-function getImplementationNote(action: string): string {
-  const cleanAction = action.toLowerCase();
+function getDoNotChangeItems(result: ScoreResult): string[] {
+  const items: string[] = [];
+
+  if (
+    result.strengths.some((strength) => strength.toLowerCase().includes("title"))
+  ) {
+    items.push("Page title already contains useful target keyword relevance.");
+  }
+
+  if (result.signals.headings.h1.length > 0) {
+    items.push(`H1 is already present: ${result.signals.headings.h1[0]}`);
+  }
+
+  if (result.signals.headings.h2.length > 0) {
+    items.push(
+      "Existing service sections/headings are useful. Improve them rather than replacing them."
+    );
+  }
+
+  if (result.signals.hasPhoneNumber || result.signals.ctaWords.length > 0) {
+    items.push(
+      "Phone number and/or call-to-action placement is already detected."
+    );
+  }
+
+  if (result.signals.trustSignals.length > 0) {
+    items.push(
+      `Existing review/trust content is useful: ${result.signals.trustSignals.join(", ")}.`
+    );
+  }
+
+  if (items.length === 0) {
+    items.push(
+      "Keep any accurate business details, service copy, phone numbers, and existing trust content that are already on the page."
+    );
+  }
+
+  return items;
+}
+
+function getTaskDetails(
+  action: PrioritizedAction,
+  page: ReportPageDetails
+): {
+  whereToImplement: string;
+  whatToChange: string;
+  example: string;
+  expectedOutcome: string;
+} {
+  const cleanAction = action.action.toLowerCase();
+  const location = getLocation(page);
 
   if (cleanAction.includes("faqpage schema")) {
-    return "Add JSON-LD FAQPage schema to the page head or through the SEO plugin for the FAQ section already visible on the page.";
+    return {
+      whereToImplement:
+        "WordPress SEO plugin custom schema field, theme page head, or page-level JSON-LD injection area.",
+      whatToChange:
+        "Add JSON-LD FAQPage schema that matches the FAQ content already visible on the page.",
+      example: `Example JSON-LD:
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "Do you offer ${page.keyword || "this service"} in ${location}?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Yes, we help customers in ${location} with ${page.keyword || "this service"}. Contact us for advice and availability."
+      }
+    }
+  ]
+}
+</script>`,
+      expectedOutcome:
+        "Search engines can understand the visible FAQ content as structured question-and-answer information."
+    };
   }
 
   if (cleanAction.includes("internal links")) {
-    return "Add contextual links inside relevant service sections to related service or location pages.";
+    return {
+      whereToImplement:
+        "Inside relevant service sections in the main page content.",
+      whatToChange:
+        "Add contextual links to related service pages using natural anchor text.",
+      example:
+        "Example anchors to use where relevant: laptop repair, Mac repair, data recovery, virus removal.",
+      expectedOutcome:
+        "Visitors and search engines can move more easily between related service pages."
+    };
+  }
+
+  if (cleanAction.includes("areaServed".toLowerCase())) {
+    return {
+      whereToImplement:
+        "Inside the LocalBusiness JSON-LD schema block.",
+      whatToChange:
+        "Add areaServed using the target town and nearby service area.",
+      example: `Example areaServed:
+"areaServed": [
+  "${location}",
+  "nearby towns and villages"
+]`,
+      expectedOutcome:
+        "The LocalBusiness schema clearly states the local area the business serves."
+    };
   }
 
   if (
     cleanAction.includes("schema blocks") ||
     cleanAction.includes("consolidate")
   ) {
-    return "Keep one consistent LocalBusiness block where possible, and make sure the business name, phone, URL, and service area match across schema.";
+    return {
+      whereToImplement:
+        "Existing JSON-LD schema output in the SEO plugin, theme, or page template.",
+      whatToChange:
+        "Keep one consistent LocalBusiness block. Check name, URL, phone, address, opening hours, and areaServed.",
+      example:
+        "Remove duplicate/conflicting LocalBusiness blocks and keep the most complete version.",
+      expectedOutcome:
+        "Structured data is clearer, easier to validate, and less likely to contain conflicting business details."
+    };
   }
 
   if (cleanAction.includes("openinghours")) {
-    return "Add openingHoursSpecification to the LocalBusiness JSON-LD block.";
+    return {
+      whereToImplement:
+        "Inside the LocalBusiness JSON-LD schema block.",
+      whatToChange:
+        "Add openingHoursSpecification with the correct opening days and times.",
+      example: `Example openingHoursSpecification:
+"openingHoursSpecification": [
+  {
+    "@type": "OpeningHoursSpecification",
+    "dayOfWeek": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
+    "opens": "09:00",
+    "closes": "17:30"
+  }
+]`,
+      expectedOutcome:
+        "The LocalBusiness schema gives clearer business availability information."
+    };
   }
 
   if (
     cleanAction.includes("case study") ||
     cleanAction.includes("example job")
   ) {
-    return "Add one short recent job example with the problem, location, fix, and outcome.";
+    return {
+      whereToImplement:
+        "Add a short section in the main content, near service details or trust content.",
+      whatToChange:
+        "Add one recent, location-specific job example.",
+      example: `Copy template:
+Recent ${location} repair example: A customer in [area] had [problem]. We [fix]. The device was returned in [timeframe].`,
+      expectedOutcome:
+        "The page gains unique local proof and more specific service detail."
+    };
   }
 
   if (cleanAction.includes("meta wording")) {
-    return "Update the SEO title/meta plugin field with clearer benefit-led wording and a call to action.";
+    return {
+      whereToImplement:
+        "SEO title/meta plugin field or page metadata settings.",
+      whatToChange:
+        "Rewrite the meta description to include the service, location, benefit, and call to action.",
+      example: `Example meta description:
+Need ${page.keyword || "local service help"} in ${location}? Get clear advice, fast support, and trusted local service. Contact us today for a quote.`,
+      expectedOutcome:
+        "The search result snippet becomes clearer and more likely to earn clicks."
+    };
   }
 
-  if (cleanAction.includes("areaServed".toLowerCase())) {
-    return "Add areaServed to the LocalBusiness JSON-LD block using the target town and surrounding service area.";
-  }
-
-  return "Implement this in the page content, template, or SEO settings depending on where the current page is managed.";
+  return {
+    whereToImplement:
+      "Relevant page content, SEO plugin, schema settings, or page template.",
+    whatToChange: action.action,
+    example:
+      "Use the existing page style and add the smallest clear change needed to complete this task.",
+    expectedOutcome: action.whyItMatters
+  };
 }
 
-function formatActions(
+function formatTasks(
   actions: PrioritizedAction[],
-  priority: PrioritizedAction["priority"]
+  priority: PrioritizedAction["priority"],
+  page: ReportPageDetails
 ): string {
   const filteredActions = actions.filter(
     (action) => action.priority === priority
   );
 
   if (filteredActions.length === 0) {
-    return `${priorityLabels[priority]}\n\nNo actions in this group.`;
+    return `${priorityLabels[priority]}\n\nNo tasks in this group.`;
   }
 
   return [
     priorityLabels[priority],
-    ...filteredActions.map((action) =>
-      [
-        "Action:",
+    ...filteredActions.map((action, index) => {
+      const details = getTaskDetails(action, page);
+
+      return [
+        `Task ${index + 1}`,
+        "",
+        "Task:",
         action.action,
         "",
-        "What to do:",
-        getImplementationNote(action.action),
+        "Where to implement:",
+        details.whereToImplement,
         "",
-        "Why it matters:",
-        action.whyItMatters,
+        "What to change:",
+        details.whatToChange,
+        "",
+        "Example code or copy:",
+        details.example,
+        "",
+        "Expected outcome:",
+        details.expectedOutcome,
         "",
         "Estimated score gain:",
         `+${action.estimatedScoreGain}`
-      ].join("\n")
-    )
-  ].join("\n\n");
-}
-
-function formatCategoryScores(scores: ScoreResult["categoryScores"]): string {
-  return Object.entries(scores)
-    .map(([key, value]) => {
-      const label = categoryLabels[key as keyof ScoreResult["categoryScores"]];
-      return `- ${label}: ${value}`;
+      ].join("\n");
     })
-    .join("\n");
+  ].join("\n\n");
 }
 
 export function generateDeveloperReport({
@@ -123,39 +263,30 @@ export function generateDeveloperReport({
   result
 }: GenerateReportInput): string {
   return [
-    "LOCAL SEO DEVELOPER REPORT",
+    "LOCAL SEO DEVELOPER TASK SHEET",
     "",
     "PAGE DETAILS",
-    `Target keyword: ${page.keyword || "Not provided"}`,
-    `Location: ${page.location || "Not provided"}`,
-    `URL: ${page.url || "Not provided"}`,
-    `Page title: ${page.title || "Not provided"}`,
-    `Meta description: ${page.metaDescription || "Not provided"}`,
+    `- Target keyword: ${page.keyword || "Not provided"}`,
+    `- Location: ${page.location || "Not provided"}`,
+    `- URL: ${page.url || "Not provided"}`,
+    `- Score / grade: ${result.totalScore}/100 (${result.grade})`,
     "",
-    "SCORE SUMMARY",
-    `Total score: ${result.totalScore}/100`,
-    `Grade: ${result.grade}`,
+    "DO NOT CHANGE",
+    listItems(getDoNotChangeItems(result)),
     "",
-    "CATEGORY SCORES",
-    formatCategoryScores(result.categoryScores),
+    "TASKS FOR DEVELOPER",
+    formatTasks(result.prioritizedActions, "high", page),
     "",
-    "RECOMMENDED ACTIONS",
-    formatActions(result.prioritizedActions, "high"),
+    formatTasks(result.prioritizedActions, "medium", page),
     "",
-    formatActions(result.prioritizedActions, "medium"),
+    formatTasks(result.prioritizedActions, "low", page),
     "",
-    formatActions(result.prioritizedActions, "low"),
-    "",
-    "STRENGTHS",
-    listItems(result.strengths),
-    "",
-    "WEAKNESSES",
-    listItems(result.weaknesses),
-    "",
-    "MISSING ITEMS",
-    listItems(result.missingItems),
-    "",
-    "EVIDENCE ITEMS",
-    listItems(result.evidenceItems)
+    "DEVELOPER QA CHECKLIST",
+    "- Run Google Rich Results Test",
+    "- Validate JSON-LD",
+    "- Check page still has one H1",
+    "- Check phone links still work",
+    "- Check page loads correctly on mobile",
+    "- Check no duplicate/conflicting LocalBusiness schema remains"
   ].join("\n");
 }
