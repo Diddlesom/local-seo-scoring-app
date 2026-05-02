@@ -1,13 +1,29 @@
 export type ScoringInput = {
   businessName?: string;
+  keyword?: string;
   location?: string;
+  title?: string;
+  metaDescription?: string;
+  html?: string;
+  text?: string;
   websiteUrl?: string;
 };
 
 export type ExtractedSignals = {
-  overview: Record<string, unknown>;
-  missingCoverage: Record<string, unknown>;
-  benchmark: Record<string, unknown>;
+  wordCount: number;
+  headings: {
+    h1: string[];
+    h2: string[];
+    h3: string[];
+  };
+  titleKeywordMatch: boolean;
+  metaDescriptionKeywordMatch: boolean;
+  metaDescriptionLocationMatch: boolean;
+  locationMentionCount: number;
+  hasPhoneNumber: boolean;
+  trustSignals: string[];
+  ctaWords: string[];
+  schemaTypes: string[];
   evidence: string[];
 };
 
@@ -17,13 +33,23 @@ export type PriorityAction = {
   priority: "low" | "medium" | "high";
 };
 
+export type CategoryScores = {
+  content: number;
+  headings: number;
+  metadata: number;
+  localSignals: number;
+  trust: number;
+  conversion: number;
+  schema: number;
+};
+
 export type ScoreResult = {
-  score: number | null;
-  sections: {
-    overview: Record<string, unknown>;
-    missingCoverage: Record<string, unknown>;
-    benchmark: Record<string, unknown>;
-    actions: PriorityAction[];
-    evidence: string[];
-  };
+  categoryScores: CategoryScores;
+  totalScore: number;
+  grade: "A" | "B" | "C" | "D" | "F";
+  strengths: string[];
+  weaknesses: string[];
+  missingItems: string[];
+  evidenceItems: string[];
+  signals: ExtractedSignals;
 };

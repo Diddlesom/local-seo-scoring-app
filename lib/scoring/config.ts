@@ -1,10 +1,15 @@
 export const scoringConfig = {
   maxScore: 100,
-  sections: [
-    "Overview",
-    "Missing Coverage",
-    "Benchmark",
-    "Actions",
-    "Evidence"
-  ]
+  categoryWeights: {
+    content: 15,
+    headings: 15,
+    metadata: 20,
+    localSignals: 15,
+    trust: 10,
+    conversion: 10,
+    schema: 15
+  },
+  trustSignalWords: ["reviews", "no fix no fee", "warranty", "years experience"],
+  ctaWords: ["call", "contact", "book", "quote", "get help"],
+  schemaTypes: ["LocalBusiness", "Service", "FAQPage"]
 } as const;
