@@ -58,6 +58,66 @@ function getImplementationRisk(action: string): "low" | "medium" | "high" {
   return "low";
 }
 
+function normalizeUrlForComparison(url: string): string {
+  try {
+    const parsedUrl = new URL(url);
+    const pathname = parsedUrl.pathname.replace(/\/+$/g, "") || "/";
+
+    return `${parsedUrl.origin}${pathname}`.toLowerCase();
+  } catch {
+    return url.toLowerCase().replace(/\/+$/g, "");
+  }
+}
+
+function looksLikeBlogUrl(url: string): boolean {
+  try {
+    return /\/(blog|news|article|articles|post|posts|category|tag)\//i.test(
+      new URL(url).pathname
+    );
+  } catch {
+    return /\b(blog|news|article|post|category|tag)\b/i.test(url);
+  }
+}
+
+function getInternalLinkScore(link: { text: string; url: string }): number {
+  const comparable = `${link.text} ${link.url}`.toLowerCase();
+  const priorityTerms = [
+    "computer-repair",
+    "computer repair",
+    "repair",
+    "laptop",
+    "mac",
+    "data-recovery",
+    "data recovery",
+    "virus",
+    "service",
+    "location"
+  ];
+
+  return priorityTerms.reduce(
+    (score, term) => score + (comparable.includes(term) ? 1 : 0),
+    0
+  );
+}
+
+function getStrongInternalLinks(
+  page: ReportPageDetails
+): ReportPageDetails["relatedInternalLinks"] {
+  const currentPageUrl = normalizeUrlForComparison(page.url);
+  const strongLinks = page.relatedInternalLinks
+    .filter((link) => normalizeUrlForComparison(link.url) !== currentPageUrl)
+    .filter((link) => !looksLikeBlogUrl(link.url))
+    .map((link) => ({
+      ...link,
+      score: getInternalLinkScore(link)
+    }))
+    .filter((link) => link.score > 0)
+    .sort((first, second) => second.score - first.score)
+    .slice(0, 5);
+
+  return strongLinks.map(({ text, url }) => ({ text, url }));
+}
+
 function listItems(items: string[]): string {
   if (items.length === 0) {
     return "- None found";
@@ -167,12 +227,13 @@ function getTaskDetails(
   }
 
   if (cleanAction.includes("internal links")) {
+    const strongLinks = getStrongInternalLinks(page);
     const detectedLinks =
-      page.relatedInternalLinks.length > 0
-        ? page.relatedInternalLinks
+      strongLinks.length > 0
+        ? strongLinks
             .map((link) => `- ${link.text}: ${link.url}`)
             .join("\n")
-        : "Use real existing URLs from the site. Do not create links to pages that do not exist.";
+        : "Use real existing service/location URLs from the site. Do not invent pages.";
 
     return {
       whereToImplement:

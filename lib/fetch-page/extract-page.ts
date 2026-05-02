@@ -276,16 +276,24 @@ function extractRelatedInternalLinks(
   html: string
 ): FetchedPageData["relatedInternalLinks"] {
   const baseUrl = new URL(pageUrl);
+  const currentPageUrl = normalizeUrlForComparison(baseUrl);
   const linkPattern = /<a\b[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi;
   const relatedWords = [
+    "computer repair",
+    "computer-repair",
     "laptop repair",
+    "laptop",
     "mac repair",
+    "mac",
     "data recovery",
+    "data-recovery",
     "virus removal",
+    "virus",
     "repair",
-    "service"
+    "service",
+    "location"
   ];
-  const links = new Map<string, { text: string; url: string }>();
+  const links = new Map<string, { score: number; text: string; url: string }>();
   let match = linkPattern.exec(html);
 
   while (match) {
@@ -293,12 +301,19 @@ function extractRelatedInternalLinks(
       const resolvedUrl = new URL(match[1], baseUrl);
       const text = stripTags(match[2]);
       const comparable = `${text} ${resolvedUrl.pathname}`.toLowerCase();
+      const score = relatedWords.reduce(
+        (total, word) => total + (comparable.includes(word) ? 1 : 0),
+        0
+      );
 
       if (
         resolvedUrl.hostname === baseUrl.hostname &&
-        relatedWords.some((word) => comparable.includes(word))
+        normalizeUrlForComparison(resolvedUrl) !== currentPageUrl &&
+        score > 0 &&
+        !looksLikeBlogUrl(resolvedUrl)
       ) {
         links.set(resolvedUrl.toString(), {
+          score,
           text: text || resolvedUrl.pathname,
           url: resolvedUrl.toString()
         });
@@ -310,7 +325,21 @@ function extractRelatedInternalLinks(
     match = linkPattern.exec(html);
   }
 
-  return Array.from(links.values()).slice(0, 8);
+  return Array.from(links.values())
+    .sort((first, second) => second.score - first.score)
+    .slice(0, 5)
+    .map(({ text, url }) => ({ text, url }));
+}
+
+function normalizeUrlForComparison(url: URL): string {
+  const pathname = url.pathname.replace(/\/+$/g, "") || "/";
+  return `${url.origin}${pathname}`.toLowerCase();
+}
+
+function looksLikeBlogUrl(url: URL): boolean {
+  return /\/(blog|news|article|articles|post|posts|category|tag)\//i.test(
+    url.pathname
+  );
 }
 
 export function extractPageData(url: string, html: string): FetchedPageData {
