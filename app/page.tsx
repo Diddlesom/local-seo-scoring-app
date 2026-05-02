@@ -8,6 +8,7 @@ type FetchedPageData = {
   title: string;
   metaDescription: string;
   html: string;
+  cleanText: string;
   bodyText: string;
   schemaJson: string;
 };
@@ -145,7 +146,7 @@ export default function Home() {
         ...current,
         title: pageData.title,
         metaDescription: pageData.metaDescription,
-        pageContent: pageData.html || pageData.bodyText,
+        pageContent: pageData.cleanText || pageData.bodyText || pageData.html,
         schemaJson: pageData.schemaJson
       }));
       setFetchMessage("URL fetched. Review the fields, then score the page.");

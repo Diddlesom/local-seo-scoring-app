@@ -3,6 +3,7 @@ export type FetchedPageData = {
   title: string;
   metaDescription: string;
   html: string;
+  cleanText: string;
   bodyText: string;
   headings: {
     h1: string[];
