@@ -17,9 +17,21 @@ export type ReportPageDetails = {
   }>;
 };
 
+export type BenchmarkCompetitor = {
+  url: string;
+  title: string;
+  wordCount: number;
+  headingsCount: number;
+  schemaTypes: string[];
+  trustSignals: string[];
+  topicsServices: string[];
+  gapsFound: string[];
+};
+
 type GenerateReportInput = {
   page: ReportPageDetails;
   result: ScoreResult;
+  benchmark?: BenchmarkCompetitor[];
 };
 
 const priorityLabels: Record<PrioritizedAction["priority"], string> = {
@@ -191,6 +203,41 @@ function listItems(items: string[]): string {
   }
 
   return items.map((item) => `- ${cleanReportText(item)}`).join("\n");
+}
+
+function formatBenchmark(benchmark?: BenchmarkCompetitor[]): string {
+  if (!benchmark || benchmark.length === 0) {
+    return "No competitor benchmark has been added yet.";
+  }
+
+  return benchmark
+    .map((competitor, index) =>
+      [
+        `Competitor ${index + 1}`,
+        `- URL: ${competitor.url}`,
+        `- Title: ${competitor.title ? cleanReportText(competitor.title) : "Not found"}`,
+        `- Word count: ${competitor.wordCount}`,
+        `- Headings count: ${competitor.headingsCount}`,
+        `- Schema types: ${
+          competitor.schemaTypes.length
+            ? competitor.schemaTypes.join(", ")
+            : "None detected"
+        }`,
+        `- Trust signals: ${
+          competitor.trustSignals.length
+            ? competitor.trustSignals.map(cleanReportText).join(", ")
+            : "None detected"
+        }`,
+        `- Topics/services detected: ${
+          competitor.topicsServices.length
+            ? competitor.topicsServices.map(cleanReportText).join(", ")
+            : "None detected"
+        }`,
+        "Target page gaps found:",
+        listItems(competitor.gapsFound)
+      ].join("\n")
+    )
+    .join("\n\n");
 }
 
 function getDoNotChangeItems(result: ScoreResult): string[] {
@@ -468,7 +515,8 @@ function formatTasks(
 
 export function generateDeveloperReport({
   page,
-  result
+  result,
+  benchmark
 }: GenerateReportInput): string {
   return [
     "LOCAL SEO DEVELOPER TASK SHEET",
@@ -485,6 +533,9 @@ export function generateDeveloperReport({
     "",
     "DO NOT CHANGE",
     listItems(getDoNotChangeItems(result)),
+    "",
+    "COMPETITOR BENCHMARK",
+    formatBenchmark(benchmark),
     "",
     "TASKS FOR DEVELOPER",
     formatTasks(result.prioritizedActions, "high", page),

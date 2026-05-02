@@ -202,6 +202,96 @@ nav a:hover {
   padding: 22px;
 }
 
+.benchmark-panel {
+  display: grid;
+  gap: 18px;
+  margin-top: 24px;
+  padding: 24px;
+}
+
+.benchmark-panel .card-heading p {
+  color: #607166;
+  line-height: 1.5;
+  margin: 8px 0 0;
+  max-width: 680px;
+}
+
+.benchmark-button {
+  min-height: 48px;
+  white-space: nowrap;
+}
+
+.competitor-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.benchmark-results {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.benchmark-card {
+  background: linear-gradient(180deg, #ffffff, #f8fcf9);
+  border: 1px solid #dbe9de;
+  border-radius: 18px;
+  box-shadow: 0 14px 36px rgba(7, 45, 30, 0.06);
+  display: grid;
+  gap: 10px;
+  padding: 18px;
+}
+
+.benchmark-card h3 {
+  color: #12201a;
+  font-size: 17px;
+  line-height: 1.35;
+  margin: 0;
+}
+
+.benchmark-url {
+  color: #607166;
+  font-size: 13px;
+  line-height: 1.4;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.benchmark-card dl {
+  display: grid;
+  gap: 10px;
+  margin: 4px 0 0;
+}
+
+.benchmark-card dl div {
+  background: #f7fbf8;
+  border: 1px solid #e5efe7;
+  border-radius: 12px;
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+}
+
+.benchmark-card dt {
+  color: #5f7b68;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.benchmark-card dd {
+  color: #1e3127;
+  font-size: 14px;
+  line-height: 1.45;
+  margin: 0;
+}
+
+.muted-inline {
+  color: #7b8a81;
+}
+
 .card-heading {
   align-items: center;
   display: flex;
@@ -724,7 +814,7 @@ li {
 
   nav {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 
   nav a {
@@ -732,6 +822,8 @@ li {
   }
 
   .form-grid,
+  .competitor-grid,
+  .benchmark-results,
   .score-summary,
   .result-grid,
   .recommendation-groups {

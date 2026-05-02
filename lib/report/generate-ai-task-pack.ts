@@ -1,9 +1,10 @@
-import type { ReportPageDetails } from "./generate-report";
+import type { BenchmarkCompetitor, ReportPageDetails } from "./generate-report";
 import type { PrioritizedAction, ScoreResult } from "../scoring/types";
 
 type GenerateAiTaskPackInput = {
   page: ReportPageDetails;
   result: ScoreResult;
+  benchmark?: BenchmarkCompetitor[];
 };
 
 const priorityLabels: Record<PrioritizedAction["priority"], string> = {
@@ -333,9 +334,47 @@ function formatTask(
   ].join("\n");
 }
 
+function formatBenchmarkContext(benchmark?: BenchmarkCompetitor[]): string {
+  if (!benchmark || benchmark.length === 0) {
+    return "No competitor benchmark has been added yet.";
+  }
+
+  return benchmark
+    .map((competitor, index) =>
+      [
+        `Competitor ${index + 1}`,
+        `- URL: ${competitor.url}`,
+        `- Title: ${competitor.title ? cleanText(competitor.title) : "Not found"}`,
+        `- Word count: ${competitor.wordCount}`,
+        `- Headings count: ${competitor.headingsCount}`,
+        `- Schema types: ${
+          competitor.schemaTypes.length
+            ? competitor.schemaTypes.join(", ")
+            : "None detected"
+        }`,
+        `- Trust signals: ${
+          competitor.trustSignals.length
+            ? competitor.trustSignals.map(cleanText).join(", ")
+            : "None detected"
+        }`,
+        `- Topics/services detected: ${
+          competitor.topicsServices.length
+            ? competitor.topicsServices.map(cleanText).join(", ")
+            : "None detected"
+        }`,
+        "Target page gaps found:",
+        competitor.gapsFound.length
+          ? competitor.gapsFound.map((gap) => `- ${cleanText(gap)}`).join("\n")
+          : "- None found"
+      ].join("\n")
+    )
+    .join("\n\n");
+}
+
 export function generateAiTaskPack({
   page,
-  result
+  result,
+  benchmark
 }: GenerateAiTaskPackInput): string {
   return [
     "LOCAL SEO AI TASK PACK",
@@ -356,6 +395,9 @@ export function generateAiTaskPack({
     `- Page title: ${page.title ? cleanText(page.title) : "Not provided"}`,
     `- Meta description: ${page.metaDescription ? cleanText(page.metaDescription) : "Not provided"}`,
     `- Score / grade: ${result.totalScore}/100 (${result.grade})`,
+    "",
+    "COMPETITOR BENCHMARK CONTEXT",
+    formatBenchmarkContext(benchmark),
     "",
     "TASKS",
     result.prioritizedActions.length

@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { FormEvent } from "react";
 import { generateAiTaskPack } from "../lib/report/generate-ai-task-pack";
 import { generateDeveloperReport } from "../lib/report/generate-report";
+import type { BenchmarkCompetitor } from "../lib/report/generate-report";
 import { generatePdfReport } from "../lib/report/generate-pdf-report";
 import { scoringConfig } from "../lib/scoring/config";
 import type { ScoreResult } from "../lib/scoring/types";
@@ -67,6 +68,10 @@ type TextFormField =
   | "websiteUrl"
   | "pageContent"
   | "schemaJson";
+
+type BenchmarkResult = BenchmarkCompetitor & {
+  error?: string;
+};
 
 const initialFormState: FormState = {
   keyword: "",
@@ -136,6 +141,24 @@ const categoryLabels: Record<keyof ScoreResult["categoryScores"], string> = {
 const logoUrl =
   "https://cwccomputerrepairchard.com/wp-content/uploads/2024/02/CWC-Logo-image-1-e1777727757742.png";
 
+const topicKeywords = [
+  "laptop repair",
+  "computer repair",
+  "pc repair",
+  "mac repair",
+  "data recovery",
+  "virus removal",
+  "screen repair",
+  "battery replacement",
+  "charging port",
+  "ssd upgrade",
+  "windows setup",
+  "home visits",
+  "business support",
+  "remote support",
+  "diagnostics"
+];
+
 function ResultList({ items }: { items: string[] }) {
   if (items.length === 0) {
     return <p className="empty">Nothing found yet.</p>;
@@ -160,6 +183,66 @@ function getScoreStatus(totalScore: number): string {
   }
 
   return "Weak optimisation level. Prioritise key fixes.";
+}
+
+function getHeadingsCount(result: ScoreResult): number {
+  return (
+    result.signals.headings.h1.length +
+    result.signals.headings.h2.length +
+    result.signals.headings.h3.length
+  );
+}
+
+function detectTopicsServices(text: string): string[] {
+  const cleanText = text.toLowerCase();
+
+  return topicKeywords.filter((topic) => cleanText.includes(topic));
+}
+
+function getBenchmarkGaps({
+  competitor,
+  competitorText,
+  targetResult,
+  targetText
+}: {
+  competitor: ScoreResult;
+  competitorText: string;
+  targetResult: ScoreResult;
+  targetText: string;
+}): string[] {
+  const gaps = new Set<string>();
+  const targetTopics = detectTopicsServices(targetText);
+  const competitorTopics = detectTopicsServices(competitorText);
+  const targetHeadingCount = getHeadingsCount(targetResult);
+  const competitorHeadingCount = getHeadingsCount(competitor);
+
+  if (competitor.signals.wordCount > targetResult.signals.wordCount + 150) {
+    gaps.add("Competitor has deeper page content than the target page.");
+  }
+
+  if (competitorHeadingCount > targetHeadingCount + 2) {
+    gaps.add("Competitor uses more heading structure than the target page.");
+  }
+
+  competitor.signals.schemaTypes.forEach((schemaType) => {
+    if (!targetResult.signals.schemaTypes.includes(schemaType)) {
+      gaps.add(`Competitor uses ${schemaType} schema that the target page lacks.`);
+    }
+  });
+
+  competitor.signals.trustSignals.forEach((trustSignal) => {
+    if (!targetResult.signals.trustSignals.includes(trustSignal)) {
+      gaps.add(`Competitor shows trust signal missing from target: ${trustSignal}.`);
+    }
+  });
+
+  competitorTopics.forEach((topic) => {
+    if (!targetTopics.includes(topic)) {
+      gaps.add(`Competitor mentions ${topic}, but the target page does not.`);
+    }
+  });
+
+  return Array.from(gaps).slice(0, 6);
 }
 
 function formatIssueText(issue: string): string {
@@ -278,6 +361,20 @@ function RecommendedActions({
   );
 }
 
+function InlineList({
+  items,
+  emptyText = "None detected"
+}: {
+  items: string[];
+  emptyText?: string;
+}) {
+  if (items.length === 0) {
+    return <span className="muted-inline">{emptyText}</span>;
+  }
+
+  return <span>{items.join(", ")}</span>;
+}
+
 function createReportFileName(url: string): string {
   try {
     const parsedUrl = new URL(url);
@@ -315,8 +412,14 @@ export default function Home() {
   const [error, setError] = useState("");
   const [fetchMessage, setFetchMessage] = useState("");
   const [scoreMessage, setScoreMessage] = useState("");
+  const [benchmarkMessage, setBenchmarkMessage] = useState("");
+  const [competitorUrls, setCompetitorUrls] = useState(["", "", "", ""]);
+  const [benchmarkResults, setBenchmarkResults] = useState<BenchmarkResult[]>(
+    []
+  );
   const [isFetching, setIsFetching] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isBenchmarking, setIsBenchmarking] = useState(false);
   const [isPdfExporting, setIsPdfExporting] = useState(false);
   const [logoFailed, setLogoFailed] = useState(false);
 
@@ -332,13 +435,23 @@ export default function Home() {
     setError("");
     setFetchMessage("");
     setScoreMessage("");
+    setBenchmarkMessage("");
+    setBenchmarkResults([]);
     setResult(null);
+  }
+
+  function updateCompetitorUrl(index: number, value: string) {
+    setCompetitorUrls((current) =>
+      current.map((url, urlIndex) => (urlIndex === index ? value : url))
+    );
   }
 
   async function handleFetchUrl() {
     setError("");
     setFetchMessage("");
     setScoreMessage("");
+    setBenchmarkMessage("");
+    setBenchmarkResults([]);
     setResult(null);
 
     if (!form.websiteUrl.trim()) {
@@ -404,6 +517,8 @@ export default function Home() {
     setIsLoading(true);
     setError("");
     setScoreMessage("");
+    setBenchmarkMessage("");
+    setBenchmarkResults([]);
     setResult(null);
 
     try {
@@ -431,6 +546,7 @@ export default function Home() {
 
       const data = (await response.json()) as ScoreResult;
       setResult(data);
+      setBenchmarkResults([]);
       setScoreMessage("Page analysed successfully.");
       window.requestAnimationFrame(() => {
         document
@@ -441,6 +557,122 @@ export default function Home() {
       setError("Something went wrong while scoring the page.");
     } finally {
       setIsLoading(false);
+    }
+  }
+
+  async function analyseCompetitorUrl(url: string): Promise<BenchmarkResult> {
+    const fetchResponse = await fetch("/api/fetch-page", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ url })
+    });
+    const fetchedData = (await fetchResponse.json()) as unknown;
+
+    if (!fetchResponse.ok) {
+      const errorMessage =
+        typeof fetchedData === "object" &&
+        fetchedData !== null &&
+        "error" in fetchedData &&
+        typeof fetchedData.error === "string"
+          ? fetchedData.error
+          : "Competitor page could not be fetched.";
+
+      throw new Error(errorMessage);
+    }
+
+    const pageData = fetchedData as FetchedPageData;
+    const pageText = pageData.cleanText || pageData.bodyText || pageData.html;
+    const scoreResponse = await fetch("/api/score", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        keyword: form.keyword,
+        location: form.location,
+        title: pageData.title,
+        metaDescription: pageData.metaDescription,
+        websiteUrl: url,
+        html: pageText,
+        text: pageText,
+        headings: pageData.headings,
+        schemaJson: pageData.schemaJson
+      })
+    });
+
+    if (!scoreResponse.ok) {
+      throw new Error("Competitor page could not be scored.");
+    }
+
+    const competitorScore = (await scoreResponse.json()) as ScoreResult;
+
+    return {
+      url,
+      title: pageData.title,
+      wordCount: competitorScore.signals.wordCount,
+      headingsCount: getHeadingsCount(competitorScore),
+      schemaTypes: competitorScore.signals.schemaTypes,
+      trustSignals: competitorScore.signals.trustSignals,
+      topicsServices: detectTopicsServices(pageText),
+      gapsFound: result
+        ? getBenchmarkGaps({
+            competitor: competitorScore,
+            competitorText: pageText,
+            targetResult: result,
+            targetText: form.pageContent
+          })
+        : []
+    };
+  }
+
+  async function runCompetitorBenchmark() {
+    setError("");
+    setBenchmarkMessage("");
+
+    if (!result) {
+      setError("Please score the target page before running the benchmark.");
+      return;
+    }
+
+    const urls = competitorUrls.map((url) => url.trim()).filter(Boolean);
+
+    if (urls.length === 0) {
+      setError("Please add at least one competitor URL.");
+      return;
+    }
+
+    setIsBenchmarking(true);
+
+    try {
+      const results = await Promise.all(
+        urls.map(async (url) => {
+          try {
+            return await analyseCompetitorUrl(url);
+          } catch (benchmarkError) {
+            return {
+              url,
+              title: "",
+              wordCount: 0,
+              headingsCount: 0,
+              schemaTypes: [],
+              trustSignals: [],
+              topicsServices: [],
+              gapsFound: [],
+              error:
+                benchmarkError instanceof Error
+                  ? benchmarkError.message
+                  : "Competitor could not be analysed."
+            };
+          }
+        })
+      );
+
+      setBenchmarkResults(results);
+      setBenchmarkMessage("Competitor benchmark complete.");
+    } finally {
+      setIsBenchmarking(false);
     }
   }
 
@@ -460,7 +692,8 @@ export default function Home() {
         faqItems: form.reportData.faqItems,
         relatedInternalLinks: form.reportData.relatedInternalLinks
       },
-      result
+      result,
+      benchmark: benchmarkResults.filter((benchmark) => !benchmark.error)
     });
 
     downloadTextFile(report, createReportFileName(form.websiteUrl));
@@ -482,7 +715,8 @@ export default function Home() {
         faqItems: form.reportData.faqItems,
         relatedInternalLinks: form.reportData.relatedInternalLinks
       },
-      result
+      result,
+      benchmark: benchmarkResults.filter((benchmark) => !benchmark.error)
     });
 
     downloadTextFile(taskPack, createAiTaskPackFileName(form.websiteUrl));
@@ -536,6 +770,7 @@ export default function Home() {
         </div>
         <nav aria-label="Dashboard navigation">
           <a href="#score-page">Score Page</a>
+          <a href="#benchmark">Benchmark</a>
           <a href="#results">Results</a>
           <a href="#exports">Exports</a>
         </nav>
@@ -689,6 +924,105 @@ export default function Home() {
         {error ? <p className="error">{error}</p> : null}
         {fetchMessage ? <p className="success">{fetchMessage}</p> : null}
       </form>
+
+      <section className="benchmark-panel card" id="benchmark">
+        <div className="card-heading">
+          <div>
+            <span className="eyebrow">Competitor Benchmark</span>
+            <h2>Compare against up to 4 competitors</h2>
+            <p>
+              Paste competitor URLs manually. This uses the existing page fetch
+              and scoring logic; live SERP lookup is not enabled yet.
+            </p>
+          </div>
+          <button
+            className="secondary-button benchmark-button"
+            disabled={isBenchmarking || !result}
+            onClick={runCompetitorBenchmark}
+            type="button"
+          >
+            {isBenchmarking ? "Running benchmark..." : "Run Benchmark"}
+          </button>
+        </div>
+
+        <div className="competitor-grid">
+          {competitorUrls.map((url, index) => (
+            <label key={`competitor-${index + 1}`}>
+              Competitor URL {index + 1}
+              <input
+                onChange={(event) =>
+                  updateCompetitorUrl(index, event.target.value)
+                }
+                placeholder="https://competitor-site.com/service-page"
+                type="url"
+                value={url}
+              />
+            </label>
+          ))}
+        </div>
+
+        {!result ? (
+          <p className="helper-text">
+            Score the target page first, then run the competitor benchmark.
+          </p>
+        ) : null}
+        {benchmarkMessage ? (
+          <p className="success">{benchmarkMessage}</p>
+        ) : null}
+
+        {benchmarkResults.length > 0 ? (
+          <div className="benchmark-results">
+            {benchmarkResults.map((benchmark, index) => (
+              <article className="benchmark-card" key={benchmark.url}>
+                <span className="eyebrow">Competitor {index + 1}</span>
+                <h3>{benchmark.title || benchmark.url}</h3>
+                <p className="benchmark-url">{benchmark.url}</p>
+                {benchmark.error ? (
+                  <p className="error">{benchmark.error}</p>
+                ) : (
+                  <dl>
+                    <div>
+                      <dt>Word count</dt>
+                      <dd>{benchmark.wordCount}</dd>
+                    </div>
+                    <div>
+                      <dt>Headings count</dt>
+                      <dd>{benchmark.headingsCount}</dd>
+                    </div>
+                    <div>
+                      <dt>Schema types</dt>
+                      <dd>
+                        <InlineList items={benchmark.schemaTypes} />
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>Trust signals</dt>
+                      <dd>
+                        <InlineList items={benchmark.trustSignals} />
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>Topics/services detected</dt>
+                      <dd>
+                        <InlineList items={benchmark.topicsServices} />
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>Target gaps found</dt>
+                      <dd>
+                        <InlineList
+                          emptyText="No clear gaps found"
+                          items={benchmark.gapsFound}
+                        />
+                      </dd>
+                    </div>
+                  </dl>
+                )}
+              </article>
+            ))}
+          </div>
+        ) : null}
+      </section>
 
       {result ? (
         <section className="results" id="results" aria-live="polite">
