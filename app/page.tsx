@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { FormEvent } from "react";
 import { generateAiTaskPack } from "../lib/report/generate-ai-task-pack";
 import { generateDeveloperReport } from "../lib/report/generate-report";
+import { generatePdfReport } from "../lib/report/generate-pdf-report";
 import { scoringConfig } from "../lib/scoring/config";
 import type { ScoreResult } from "../lib/scoring/types";
 
@@ -316,6 +317,7 @@ export default function Home() {
   const [scoreMessage, setScoreMessage] = useState("");
   const [isFetching, setIsFetching] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isPdfExporting, setIsPdfExporting] = useState(false);
   const [logoFailed, setLogoFailed] = useState(false);
 
   function updateField(field: TextFormField, value: string) {
@@ -484,6 +486,32 @@ export default function Home() {
     });
 
     downloadTextFile(taskPack, createAiTaskPackFileName(form.websiteUrl));
+  }
+
+  async function exportBrandedPdfReport() {
+    if (!result) {
+      return;
+    }
+
+    setIsPdfExporting(true);
+    setError("");
+
+    try {
+      await generatePdfReport({
+        page: {
+          keyword: form.keyword,
+          location: form.location,
+          url: form.websiteUrl,
+          title: form.title,
+          metaDescription: form.metaDescription
+        },
+        result
+      });
+    } catch {
+      setError("The branded PDF report could not be exported.");
+    } finally {
+      setIsPdfExporting(false);
+    }
   }
 
   return (
@@ -716,6 +744,16 @@ export default function Home() {
                 type="button"
               >
                 Export Developer Report
+              </button>
+              <button
+                className="secondary-button pdf-export-button"
+                disabled={isPdfExporting}
+                onClick={exportBrandedPdfReport}
+                type="button"
+              >
+                {isPdfExporting
+                  ? "Exporting PDF..."
+                  : "Export Branded PDF Report"}
               </button>
               <button
                 className="primary-button export-primary"
