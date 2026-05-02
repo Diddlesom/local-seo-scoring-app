@@ -226,7 +226,11 @@ export default function Home() {
           <button disabled={isLoading} type="submit">
             {isLoading ? "Scoring..." : "Score Page"}
           </button>
-          <button className="secondary-button" onClick={loadExample} type="button">
+          <button
+            className="secondary-button"
+            onClick={loadExample}
+            type="button"
+          >
             Load Example
           </button>
         </div>
