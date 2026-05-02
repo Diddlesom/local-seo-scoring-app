@@ -53,20 +53,23 @@ function findMatches(text: string, words: readonly string[]): string[] {
   return words.filter((word) => cleanText.includes(word.toLowerCase()));
 }
 
-function findSchemaTypes(html: string): string[] {
+function findSchemaTypes(schemaSource: string): string[] {
   return scoringConfig.schemaTypes.filter((type) =>
-    new RegExp(`"@type"\\s*:\\s*"[^"]*${type}[^"]*"`, "i").test(html)
+    new RegExp(`"@type"\\s*:\\s*"[^"]*${type}[^"]*"`, "i").test(
+      schemaSource
+    )
   );
 }
 
 export function extractSignals(input: ScoringInput): ExtractedSignals {
   const html = input.html ?? "";
+  const schemaSource = `${html}\n${input.schemaJson ?? ""}`;
   const pageText = input.text ?? stripHtml(html);
   const title = input.title ?? "";
   const metaDescription = input.metaDescription ?? "";
   const trustSignals = findMatches(pageText, scoringConfig.trustSignalWords);
   const ctaWords = findMatches(pageText, scoringConfig.ctaWords);
-  const schemaTypes = findSchemaTypes(html);
+  const schemaTypes = findSchemaTypes(schemaSource);
   const locationMentionCount = countPhrase(pageText, input.location);
   const hasPhoneNumber = findPhoneNumber(pageText);
   const titleKeywordMatch = includesPhrase(title, input.keyword);
