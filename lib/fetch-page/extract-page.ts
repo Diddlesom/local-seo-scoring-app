@@ -142,8 +142,14 @@ function getBodyHtml(html: string): string {
 
 function htmlToLines(html: string): string[] {
   return html
-    .replace(/<(h[1-6]|p|li|br|div|section|article)\b[^>]*>/gi, "\n")
-    .replace(/<\/(h[1-6]|p|li|div|section|article)>/gi, "\n")
+    .replace(
+      /<(h[1-6]|p|li|br|div|section|article|summary|button|dt)\b[^>]*>/gi,
+      "\n"
+    )
+    .replace(
+      /<\/(h[1-6]|p|li|div|section|article|summary|button|dt)>/gi,
+      "\n"
+    )
     .split("\n")
     .map(stripTags)
     .filter(Boolean);
@@ -212,22 +218,56 @@ function extractAddressLikeText(text: string): string[] {
     .slice(0, 5);
 }
 
-function extractFaqQuestions(
-  text: string,
-  headings: FetchedPageData["headings"]
-): string[] {
-  const headingQuestions = [...headings.h1, ...headings.h2, ...headings.h3];
-  const textQuestions = text
-    .split("\n")
-    .map(cleanText)
-    .filter((line) => line.endsWith("?"));
+function isFaqHeading(text: string): boolean {
+  return /\b(frequently asked questions|faqs?|faq)\b/i.test(text);
+}
+
+function getHeadingLevel(tagName: string): number {
+  return Number(tagName.replace(/h/i, ""));
+}
+
+function extractFaqQuestions(html: string): string[] {
+  const headingPattern = /<(h[1-6])[^>]*>([\s\S]*?)<\/\1>/gi;
+  const faqSections: string[] = [];
+  let match = headingPattern.exec(html);
+
+  while (match) {
+    const headingTag = match[1];
+    const headingText = stripTags(match[2]);
+
+    if (isFaqHeading(headingText)) {
+      const faqHeadingLevel = getHeadingLevel(headingTag);
+      const sectionStart = match.index + match[0].length;
+      const restOfHtml = html.slice(sectionStart);
+      const nextHeadingPattern = /<(h[1-6])[^>]*>[\s\S]*?<\/\1>/gi;
+      let nextHeading = nextHeadingPattern.exec(restOfHtml);
+      let sectionEnd = html.length;
+
+      while (nextHeading) {
+        const nextHeadingLevel = getHeadingLevel(nextHeading[1]);
+
+        if (nextHeadingLevel <= faqHeadingLevel) {
+          sectionEnd = sectionStart + nextHeading.index;
+          break;
+        }
+
+        nextHeading = nextHeadingPattern.exec(restOfHtml);
+      }
+
+      faqSections.push(html.slice(sectionStart, sectionEnd));
+    }
+
+    match = headingPattern.exec(html);
+  }
+
+  const faqQuestions = faqSections.flatMap((sectionHtml) =>
+    htmlToLines(sectionHtml).filter(
+      (line) => line.endsWith("?") && !isFaqHeading(line)
+    )
+  );
 
   return Array.from(
-    new Set(
-      [...headingQuestions, ...textQuestions].filter((line) =>
-        line.endsWith("?")
-      )
-    )
+    new Set(faqQuestions)
   ).slice(0, 8);
 }
 
@@ -295,7 +335,7 @@ export function extractPageData(url: string, html: string): FetchedPageData {
     phoneNumbers: extractPhoneNumbers(cleanTextContent),
     telLinks: extractTelLinks(html),
     addressLikeText: extractAddressLikeText(cleanTextContent),
-    faqQuestions: extractFaqQuestions(cleanTextContent, headings),
+    faqQuestions: extractFaqQuestions(contentHtml),
     relatedInternalLinks: extractRelatedInternalLinks(url, html)
   };
 }
