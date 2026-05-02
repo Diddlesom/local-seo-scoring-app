@@ -29,6 +29,21 @@ function extractHeadings(html: string, tag: "h1" | "h2" | "h3"): string[] {
   return headings.filter(Boolean);
 }
 
+function normaliseHeadings(
+  headings: ScoringInput["headings"] | undefined,
+  html: string
+): ExtractedSignals["headings"] {
+  const h1 = headings?.h1?.filter(Boolean) ?? [];
+  const h2 = headings?.h2?.filter(Boolean) ?? [];
+  const h3 = headings?.h3?.filter(Boolean) ?? [];
+
+  return {
+    h1: h1.length > 0 ? h1 : extractHeadings(html, "h1"),
+    h2: h2.length > 0 ? h2 : extractHeadings(html, "h2"),
+    h3: h3.length > 0 ? h3 : extractHeadings(html, "h3")
+  };
+}
+
 function includesPhrase(text: string, phrase?: string): boolean {
   const cleanPhrase = normalise(phrase);
   return cleanPhrase.length > 0 && normalise(text).includes(cleanPhrase);
@@ -82,11 +97,7 @@ export function extractSignals(input: ScoringInput): ExtractedSignals {
     input.location
   );
   const wordCount = countWords(pageText);
-  const headings = {
-    h1: extractHeadings(html, "h1"),
-    h2: extractHeadings(html, "h2"),
-    h3: extractHeadings(html, "h3")
-  };
+  const headings = normaliseHeadings(input.headings, html);
   const evidence = [
     `Word count: ${wordCount}`,
     `Headings found: ${headings.h1.length} H1, ${headings.h2.length} H2, ${headings.h3.length} H3`,

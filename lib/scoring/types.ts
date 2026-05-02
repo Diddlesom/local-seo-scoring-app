@@ -5,6 +5,11 @@ export type ScoringInput = {
   title?: string;
   metaDescription?: string;
   html?: string;
+  headings?: {
+    h1?: string[];
+    h2?: string[];
+    h3?: string[];
+  };
   schemaJson?: string;
   text?: string;
   websiteUrl?: string;

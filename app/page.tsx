@@ -10,6 +10,11 @@ type FetchedPageData = {
   html: string;
   cleanText: string;
   bodyText: string;
+  headings: {
+    h1: string[];
+    h2: string[];
+    h3: string[];
+  };
   schemaJson: string;
 };
 
@@ -20,6 +25,11 @@ type FormState = {
   metaDescription: string;
   websiteUrl: string;
   pageContent: string;
+  headings: {
+    h1: string[];
+    h2: string[];
+    h3: string[];
+  };
   schemaJson: string;
 };
 
@@ -30,6 +40,11 @@ const initialFormState: FormState = {
   metaDescription: "",
   websiteUrl: "",
   pageContent: "",
+  headings: {
+    h1: [],
+    h2: [],
+    h3: []
+  },
   schemaJson: ""
 };
 
@@ -48,6 +63,11 @@ const exampleFormState: FormState = {
 <p>Customers choose us because we have strong reviews, over 10 years experience, and a no fix no fee approach on selected repairs.</p>
 <h3>Get help today</h3>
 <p>Contact our Chard laptop repair team on 01460 123456 to get help with your computer problem.</p>`,
+  headings: {
+    h1: ["Laptop Repair Chard"],
+    h2: ["Fast laptop repairs in Chard, Somerset", "Why choose us?"],
+    h3: ["Get help today"]
+  },
   schemaJson: `{
   "@context": "https://schema.org",
   "@type": "LocalBusiness",
@@ -147,6 +167,7 @@ export default function Home() {
         title: pageData.title,
         metaDescription: pageData.metaDescription,
         pageContent: pageData.cleanText || pageData.bodyText || pageData.html,
+        headings: pageData.headings,
         schemaJson: pageData.schemaJson
       }));
       setFetchMessage("URL fetched. Review the fields, then score the page.");
@@ -180,6 +201,8 @@ export default function Home() {
           metaDescription: form.metaDescription,
           websiteUrl: form.websiteUrl,
           html: form.pageContent,
+          text: form.pageContent,
+          headings: form.headings,
           schemaJson: form.schemaJson
         })
       });
