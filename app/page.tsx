@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { FormEvent } from "react";
+import { generateDeveloperReport } from "../lib/report/generate-report";
 import type { ScoreResult } from "../lib/scoring/types";
 
 type FetchedPageData = {
@@ -130,6 +131,15 @@ function RecommendedActions({
   );
 }
 
+function createReportFileName(url: string): string {
+  try {
+    const parsedUrl = new URL(url);
+    return `${parsedUrl.hostname.replace(/^www\./, "")}-seo-report.txt`;
+  } catch {
+    return "local-seo-report.txt";
+  }
+}
+
 export default function Home() {
   const [form, setForm] = useState<FormState>(initialFormState);
   const [result, setResult] = useState<ScoreResult | null>(null);
@@ -246,6 +256,33 @@ export default function Home() {
     } finally {
       setIsLoading(false);
     }
+  }
+
+  function exportDeveloperReport() {
+    if (!result) {
+      return;
+    }
+
+    const report = generateDeveloperReport({
+      page: {
+        keyword: form.keyword,
+        location: form.location,
+        url: form.websiteUrl,
+        title: form.title,
+        metaDescription: form.metaDescription
+      },
+      result
+    });
+    const blob = new Blob([report], { type: "text/plain;charset=utf-8" });
+    const downloadUrl = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+
+    link.href = downloadUrl;
+    link.download = createReportFileName(form.websiteUrl);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(downloadUrl);
   }
 
   return (
@@ -380,6 +417,12 @@ export default function Home() {
               <span className="summary-label">Grade</span>
               <strong>{result.grade}</strong>
             </div>
+          </div>
+
+          <div className="result-actions">
+            <button onClick={exportDeveloperReport} type="button">
+              Export Developer Report
+            </button>
           </div>
 
           <section className="panel">
