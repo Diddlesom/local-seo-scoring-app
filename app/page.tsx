@@ -102,6 +102,34 @@ function ResultList({ items }: { items: string[] }) {
   );
 }
 
+function RecommendedActions({
+  actions,
+  priority
+}: {
+  actions: ScoreResult["prioritizedActions"];
+  priority: "high" | "medium" | "low";
+}) {
+  const filteredActions = actions.filter(
+    (action) => action.priority === priority
+  );
+
+  if (filteredActions.length === 0) {
+    return <p className="empty">No actions in this group.</p>;
+  }
+
+  return (
+    <div className="action-list">
+      {filteredActions.map((action) => (
+        <div className="action-card" key={action.action}>
+          <strong>{action.action}</strong>
+          <p>{action.whyItMatters}</p>
+          <span>Estimated score gain: {action.estimatedScoreGain}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function Home() {
   const [form, setForm] = useState<FormState>(initialFormState);
   const [result, setResult] = useState<ScoreResult | null>(null);
@@ -365,6 +393,33 @@ export default function Home() {
                   <strong>{score}</strong>
                 </div>
               ))}
+            </div>
+          </section>
+
+          <section className="panel">
+            <h2>Recommended Actions</h2>
+            <div className="recommendation-groups">
+              <div>
+                <h3>High priority</h3>
+                <RecommendedActions
+                  actions={result.prioritizedActions}
+                  priority="high"
+                />
+              </div>
+              <div>
+                <h3>Medium priority</h3>
+                <RecommendedActions
+                  actions={result.prioritizedActions}
+                  priority="medium"
+                />
+              </div>
+              <div>
+                <h3>Low priority</h3>
+                <RecommendedActions
+                  actions={result.prioritizedActions}
+                  priority="low"
+                />
+              </div>
             </div>
           </section>
 

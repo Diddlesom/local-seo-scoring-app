@@ -1,5 +1,8 @@
 import { extractSignals } from "./extractors";
-import { createPriorityActions } from "./priority-engine";
+import {
+  createPrioritizedActions,
+  createPriorityActions
+} from "./priority-engine";
 import type { CategoryScores, ScoreResult, ScoringInput } from "./types";
 
 function getGrade(totalScore: number): ScoreResult["grade"] {
@@ -142,6 +145,7 @@ function createWeaknesses(
 export function scoreLocalSeo(input: ScoringInput): ScoreResult {
   const signals = extractSignals(input);
   const actions = createPriorityActions(signals);
+  const prioritizedActions = createPrioritizedActions(input, signals);
   const categoryScores = createCategoryScores(signals);
   const totalScore = Object.values(categoryScores).reduce(
     (total, score) => total + score,
@@ -155,6 +159,7 @@ export function scoreLocalSeo(input: ScoringInput): ScoreResult {
     strengths: createStrengths(signals, categoryScores),
     weaknesses: createWeaknesses(signals, categoryScores),
     missingItems: actions.map((action) => action.title),
+    prioritizedActions,
     evidenceItems: signals.evidence,
     signals
   };

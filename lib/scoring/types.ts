@@ -39,6 +39,13 @@ export type PriorityAction = {
   priority: "low" | "medium" | "high";
 };
 
+export type PrioritizedAction = {
+  priority: "high" | "medium" | "low";
+  action: string;
+  whyItMatters: string;
+  estimatedScoreGain: number;
+};
+
 export type CategoryScores = {
   content: number;
   headings: number;
@@ -56,6 +63,7 @@ export type ScoreResult = {
   strengths: string[];
   weaknesses: string[];
   missingItems: string[];
+  prioritizedActions: PrioritizedAction[];
   evidenceItems: string[];
   signals: ExtractedSignals;
 };

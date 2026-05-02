@@ -183,6 +183,11 @@ h2 {
   margin: 0 0 14px;
 }
 
+h3 {
+  font-size: 16px;
+  margin: 0 0 10px;
+}
+
 .score-list {
   display: grid;
   gap: 10px;
@@ -206,6 +211,37 @@ h2 {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.recommendation-groups {
+  display: grid;
+  gap: 18px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.action-list {
+  display: grid;
+  gap: 10px;
+}
+
+.action-card {
+  border: 1px solid #edf0eb;
+  border-radius: 8px;
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+}
+
+.action-card p {
+  color: #53615a;
+  line-height: 1.45;
+  margin: 0;
+}
+
+.action-card span {
+  color: #2d6a4f;
+  font-size: 13px;
+  font-weight: 700;
+}
+
 ul {
   margin: 0;
   padding-left: 20px;
@@ -225,6 +261,7 @@ li {
   .form-grid,
   .score-summary,
   .result-grid,
+  .recommendation-groups,
   .url-row {
     grid-template-columns: 1fr;
   }

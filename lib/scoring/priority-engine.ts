@@ -1,6 +1,13 @@
-import type { ExtractedSignals, PriorityAction } from "./types";
+import type {
+  ExtractedSignals,
+  PrioritizedAction,
+  PriorityAction,
+  ScoringInput
+} from "./types";
 
-export function createPriorityActions(signals: ExtractedSignals): PriorityAction[] {
+export function createPriorityActions(
+  signals: ExtractedSignals
+): PriorityAction[] {
   const actions: PriorityAction[] = [];
 
   if (!signals.titleKeywordMatch) {
@@ -60,4 +67,254 @@ export function createPriorityActions(signals: ExtractedSignals): PriorityAction
   }
 
   return actions;
+}
+
+type ActionInput = {
+  action: string;
+  whyItMatters: string;
+  impact: number;
+  ease: number;
+};
+
+function mapPriority(priorityScore: number): PrioritizedAction["priority"] {
+  if (priorityScore >= 8) {
+    return "high";
+  }
+
+  if (priorityScore >= 5) {
+    return "medium";
+  }
+
+  return "low";
+}
+
+function createAction(input: ActionInput): PrioritizedAction {
+  const priorityScore = input.impact * 0.7 + input.ease * 0.3;
+
+  return {
+    priority: mapPriority(priorityScore),
+    action: input.action,
+    whyItMatters: input.whyItMatters,
+    estimatedScoreGain: input.impact
+  };
+}
+
+function includesAny(text: string, words: string[]): boolean {
+  const cleanText = text.toLowerCase();
+  return words.some((word) => cleanText.includes(word));
+}
+
+function countSchemaTypes(schemaSource: string): number {
+  return schemaSource.match(/"@type"\s*:/gi)?.length ?? 0;
+}
+
+export function createPrioritizedActions(
+  input: ScoringInput,
+  signals: ExtractedSignals
+): PrioritizedAction[] {
+  const actions: PrioritizedAction[] = [];
+  const pageText = `${input.text ?? ""}\n${input.html ?? ""}`;
+  const schemaSource = input.schemaJson ?? "";
+  const hasFaqContent = includesAny(pageText, [
+    "faq",
+    "frequently asked",
+    "questions"
+  ]);
+  const hasFaqSchema = signals.schemaTypes.includes("FAQPage");
+  const hasLocalBusinessSchema = signals.schemaTypes.includes("LocalBusiness");
+  const hasAreaServed = /"areaServed"\s*:/i.test(schemaSource);
+  const hasOpeningHours = /"openingHours"\s*:/i.test(schemaSource);
+  const hasInternalLinks =
+    /href=["']\/|href=["'][^"']*(service|repair|area|location)/i.test(
+      input.html ?? ""
+    );
+
+  if (signals.headings.h1.length === 0) {
+    actions.push(
+      createAction({
+        impact: 9,
+        ease: 8,
+        action: "Add one clear H1 heading that includes the main service and location.",
+        whyItMatters:
+          "The H1 helps search engines and visitors understand the main purpose of the page quickly."
+      })
+    );
+  }
+
+  if (!hasLocalBusinessSchema) {
+    actions.push(
+      createAction({
+        impact: 9,
+        ease: 6,
+        action: "Add LocalBusiness schema.",
+        whyItMatters:
+          "LocalBusiness schema gives search engines structured details about the business, service area, and contact information."
+      })
+    );
+  }
+
+  if (!signals.titleKeywordMatch) {
+    actions.push(
+      createAction({
+        impact: 9,
+        ease: 8,
+        action: "Add the target keyword to the page title.",
+        whyItMatters:
+          "A focused title is one of the clearest relevance signals for the target search."
+      })
+    );
+  }
+
+  if (signals.locationMentionCount === 0) {
+    actions.push(
+      createAction({
+        impact: 9,
+        ease: 8,
+        action: "Mention the target location in the page content.",
+        whyItMatters:
+          "Local pages need clear location signals to connect the service with the search area."
+      })
+    );
+  }
+
+  if (hasFaqContent && !hasFaqSchema) {
+    actions.push(
+      createAction({
+        impact: 7,
+        ease: 6,
+        action: "Add FAQPage schema for the visible FAQ content.",
+        whyItMatters:
+          "FAQPage schema helps search engines understand question-and-answer content that already exists on the page."
+      })
+    );
+  } else if (!hasFaqContent) {
+    actions.push(
+      createAction({
+        impact: 4,
+        ease: 7,
+        action: "Expand the page with a short FAQ section.",
+        whyItMatters:
+          "FAQs can answer objections, add useful long-tail content, and support local intent."
+      })
+    );
+  }
+
+  if (hasLocalBusinessSchema && !hasAreaServed) {
+    actions.push(
+      createAction({
+        impact: 6,
+        ease: 7,
+        action: `Add areaServed to LocalBusiness schema${
+          input.location ? ` for ${input.location}` : ""
+        }.`,
+        whyItMatters:
+          "The areaServed field reinforces which local area the business covers."
+      })
+    );
+  }
+
+  if (hasLocalBusinessSchema && !hasOpeningHours) {
+    actions.push(
+      createAction({
+        impact: 4,
+        ease: 6,
+        action: "Improve schema completeness by adding openingHours.",
+        whyItMatters:
+          "More complete schema can make the business details clearer and more reliable."
+      })
+    );
+  }
+
+  if (countSchemaTypes(schemaSource) > 1) {
+    actions.push(
+      createAction({
+        impact: 5,
+        ease: 5,
+        action: "Review multiple schema blocks and consolidate where sensible.",
+        whyItMatters:
+          "Cleaner structured data is easier to maintain and reduces the chance of conflicting business details."
+      })
+    );
+  }
+
+  if (signals.trustSignals.length < 3) {
+    actions.push(
+      createAction({
+        impact: 6,
+        ease: 6,
+        action:
+          "Add more testimonials, guarantees, reviews, or named technician details.",
+        whyItMatters:
+          "Trust proof helps visitors feel confident enough to contact the business."
+      })
+    );
+  }
+
+  if (!hasInternalLinks) {
+    actions.push(
+      createAction({
+        impact: 6,
+        ease: 6,
+        action: "Add internal links to related service or location pages.",
+        whyItMatters:
+          "Internal links help visitors discover related services and help search engines understand page relationships."
+      })
+    );
+  }
+
+  if (signals.wordCount < 500) {
+    actions.push(
+      createAction({
+        impact: 6,
+        ease: 5,
+        action: "Strengthen service coverage with more detail about problems solved, process, and service areas.",
+        whyItMatters:
+          "More useful service coverage can improve relevance and answer more customer questions."
+      })
+    );
+  }
+
+  if (
+    signals.metaDescriptionKeywordMatch &&
+    signals.metaDescriptionLocationMatch
+  ) {
+    actions.push(
+      createAction({
+        impact: 3,
+        ease: 7,
+        action: "Improve meta wording with a stronger benefit and call to action.",
+        whyItMatters:
+          "A clearer meta description can improve click-through even when the basics are already covered."
+      })
+    );
+  }
+
+  if (signals.locationMentionCount > 0 && signals.locationMentionCount < 3) {
+    actions.push(
+      createAction({
+        impact: 3,
+        ease: 6,
+        action: "Add one or two more natural local mentions, such as nearby areas or case studies.",
+        whyItMatters:
+          "Natural local detail can strengthen relevance without keyword stuffing."
+      })
+    );
+  }
+
+  actions.push(
+    createAction({
+      impact: 4,
+      ease: 5,
+      action: "Add a location-specific case study or recent example job.",
+      whyItMatters:
+        "Case studies give the page unique local proof beyond generic service copy."
+    })
+  );
+
+  return actions
+    .filter(
+      (action, index, allActions) =>
+        allActions.findIndex((item) => item.action === action.action) === index
+    )
+    .sort((a, b) => b.estimatedScoreGain - a.estimatedScoreGain);
 }
