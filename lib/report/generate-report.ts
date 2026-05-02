@@ -158,43 +158,241 @@ function looksLikeBlogUrl(url: string): boolean {
   }
 }
 
-function getInternalLinkScore(link: { text: string; url: string }): number {
-  const comparable = `${link.text} ${link.url}`.toLowerCase();
-  const priorityTerms = [
-    "computer-repair",
-    "computer repair",
-    "repair",
-    "laptop",
-    "mac",
-    "data-recovery",
-    "data recovery",
-    "virus",
-    "service",
-    "location"
-  ];
+type InternalLinkRecommendation = {
+  confidence: "high" | "medium";
+  pageType:
+    | "service_page"
+    | "location_page"
+    | "blog_post"
+    | "homepage"
+    | "contact_page"
+    | "other";
+  reason: string;
+  rejectedReason?: string;
+  text: string;
+  topic: string;
+  url: string;
+};
 
-  return priorityTerms.reduce(
-    (score, term) => score + (comparable.includes(term) ? 1 : 0),
-    0
+const serviceTopics = [
+  "laptop repair",
+  "mac repair",
+  "apple mac repair",
+  "data recovery",
+  "virus removal",
+  "computer repair",
+  "pc repair",
+  "ssd upgrade",
+  "screen repair"
+];
+
+function classifyInternalUrl(url: string): InternalLinkRecommendation["pageType"] {
+  try {
+    const parsedUrl = new URL(url);
+    const path = parsedUrl.pathname.toLowerCase();
+
+    if (path === "/" || path === "") {
+      return "homepage";
+    }
+
+    if (/(contact|get-in-touch|book|quote)/.test(path)) {
+      return "contact_page";
+    }
+
+    if (/(blog|news|article|articles|post|posts|category|tag)/.test(path)) {
+      return "blog_post";
+    }
+
+    if (/(location|areas-we-cover|near-me|chard|ilminster|somerset|yeovil|taunton)/.test(path)) {
+      return "location_page";
+    }
+
+    if (/(repair|service|recovery|virus|laptop|mac|computer|pc|ssd|screen)/.test(path)) {
+      return "service_page";
+    }
+  } catch {
+    if (looksLikeBlogUrl(url)) {
+      return "blog_post";
+    }
+  }
+
+  return "other";
+}
+
+function slugToWords(url: string): string {
+  try {
+    return new URL(url).pathname
+      .replace(/\.[a-z0-9]+$/i, "")
+      .replace(/[-_/]+/g, " ");
+  } catch {
+    return url.replace(/[-_/]+/g, " ");
+  }
+}
+
+function extractDestinationTopics(link: { text: string; url: string }): string[] {
+  const slugTopics = serviceTopics.filter((topic) =>
+    slugToWords(link.url).toLowerCase().includes(topic)
+  );
+
+  if (slugTopics.length > 0) {
+    return slugTopics;
+  }
+
+  return serviceTopics.filter((topic) => link.text.toLowerCase().includes(topic));
+}
+
+function extractAnchorTopics(text: string): string[] {
+  const cleanText = text.toLowerCase();
+
+  return serviceTopics.filter((topic) => cleanText.includes(topic));
+}
+
+function topicMatches(anchorTopics: string[], destinationTopics: string[]): boolean {
+  return anchorTopics.some((anchorTopic) =>
+    destinationTopics.some(
+      (destinationTopic) =>
+        anchorTopic === destinationTopic ||
+        anchorTopic.includes(destinationTopic) ||
+        destinationTopic.includes(anchorTopic)
+    )
   );
 }
 
-function getStrongInternalLinks(
+function getInternalLinkRecommendations(
   page: ReportPageDetails
-): ReportPageDetails["relatedInternalLinks"] {
+): {
+  highConfidence: InternalLinkRecommendation[];
+  mediumConfidence: InternalLinkRecommendation[];
+  rejected: InternalLinkRecommendation[];
+} {
   const currentPageUrl = normalizeUrlForComparison(page.url);
-  const strongLinks = page.relatedInternalLinks
+  const recommendations = page.relatedInternalLinks
     .filter((link) => normalizeUrlForComparison(link.url) !== currentPageUrl)
-    .filter((link) => !looksLikeBlogUrl(link.url))
-    .map((link) => ({
-      ...link,
-      score: getInternalLinkScore(link)
-    }))
-    .filter((link) => link.score > 0)
-    .sort((first, second) => second.score - first.score)
-    .slice(0, 5);
+    .map((link): InternalLinkRecommendation => {
+      const pageType = classifyInternalUrl(link.url);
+      const anchorTopics = extractAnchorTopics(link.text);
+      const destinationTopics = extractDestinationTopics(link);
+      const displayTopic =
+        destinationTopics[0] ?? anchorTopics[0] ?? cleanReportText(link.text);
 
-  return strongLinks.map(({ text, url }) => ({ text, url }));
+      if (
+        anchorTopics.length > 0 &&
+        pageType === "service_page" &&
+        topicMatches(anchorTopics, destinationTopics)
+      ) {
+        return {
+          confidence: "high",
+          pageType,
+          reason: `High confidence: ${anchorTopics[0]} matches the destination topic.`,
+          text: link.text,
+          topic: displayTopic,
+          url: link.url
+        };
+      }
+
+      if (
+        anchorTopics.length > 0 &&
+        (pageType === "blog_post" || pageType === "other") &&
+        topicMatches(anchorTopics, destinationTopics)
+      ) {
+        return {
+          confidence: "medium",
+          pageType,
+          reason:
+            "Medium confidence: topic is related, but this is not a dedicated service page.",
+          text: link.text,
+          topic: displayTopic,
+          url: link.url
+        };
+      }
+
+      return {
+        confidence: "medium",
+        pageType,
+        reason: "Rejected: topic or page type does not match the service anchor.",
+        rejectedReason:
+          pageType === "location_page"
+            ? "Do not link a service anchor to an unrelated location page."
+            : pageType === "blog_post"
+              ? "Do not link a service anchor to a generic blog post."
+              : "Anchor/topic mismatch or generic destination.",
+        text: link.text,
+        topic: displayTopic,
+        url: link.url
+      };
+    });
+
+  return {
+    highConfidence: recommendations
+      .filter((link) => link.confidence === "high" && !link.rejectedReason)
+      .slice(0, 5),
+    mediumConfidence: recommendations
+      .filter((link) => link.confidence === "medium" && !link.rejectedReason)
+      .slice(0, 5),
+    rejected: recommendations.filter((link) => link.rejectedReason).slice(0, 5)
+  };
+}
+
+function formatInternalLinkRecommendations(page: ReportPageDetails): string {
+  const recommendations = getInternalLinkRecommendations(page);
+  const formatLink = (link: InternalLinkRecommendation) =>
+    `- ${cleanReportText(link.text)} → ${link.url}\n  Reason: ${link.reason}`;
+  const highConfidence =
+    recommendations.highConfidence.length > 0
+      ? recommendations.highConfidence.map(formatLink).join("\n")
+      : "- No suitable high-confidence link found";
+  const mediumConfidence =
+    recommendations.mediumConfidence.length > 0
+      ? recommendations.mediumConfidence
+          .map(
+            (link) =>
+              `${formatLink(link)}\n  Warning: Medium confidence: not a dedicated service page.`
+          )
+          .join("\n")
+      : "- No suitable medium-confidence link found";
+  const rejected =
+    recommendations.rejected.length > 0
+      ? recommendations.rejected
+          .map(
+            (link) =>
+              `- Do not use ${cleanReportText(link.text)} → ${link.url}\n  Reason: ${link.rejectedReason}`
+          )
+          .join("\n")
+      : "- No rejected links to flag";
+
+  if (
+    recommendations.highConfidence.length === 0 &&
+    recommendations.mediumConfidence.length === 0
+  ) {
+    return [
+      "Recommended internal links:",
+      "",
+      "High-confidence links",
+      "- No suitable link found",
+      "",
+      "Medium-confidence links",
+      "- No suitable link found",
+      "",
+      "No suitable link found",
+      "Do not force an internal link. Create or confirm a dedicated page first.",
+      "",
+      "Rejected or risky links",
+      rejected
+    ].join("\n");
+  }
+
+  return [
+    "Recommended internal links:",
+    "",
+    "High-confidence links",
+    highConfidence,
+    "",
+    "Medium-confidence links",
+    mediumConfidence,
+    "",
+    "Rejected or risky links",
+    rejected
+  ].join("\n");
 }
 
 function getReportFaqItems(page: ReportPageDetails): Array<{
@@ -505,26 +703,12 @@ function getTaskDetails(
   }
 
   if (cleanAction.includes("internal links")) {
-    const strongLinks = getStrongInternalLinks(page);
-    const detectedLinks =
-      strongLinks.length > 0
-        ? strongLinks
-            .map((link) => `- ${cleanReportText(link.text)}: ${link.url}`)
-            .join("\n")
-        : "Use real existing service/location URLs from the site. Do not invent pages.";
-
     return {
       whereToImplement:
         "Inside relevant service sections in the main page content.",
       whatToChange:
-        "Add contextual links to related service pages using natural anchor text.",
-      example:
-        [
-          "Preferred anchor examples: laptop repair, Mac repair, data recovery, virus removal.",
-          "",
-          "Detected related internal URLs:",
-          detectedLinks
-        ].join("\n"),
+        "Add only contextually relevant internal links where the anchor topic matches the destination topic.",
+      example: formatInternalLinkRecommendations(page),
       expectedOutcome:
         "Visitors and search engines can move more easily between related service pages."
     };
