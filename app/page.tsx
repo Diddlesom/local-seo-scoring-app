@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { FormEvent } from "react";
+import { generateAiTaskPack } from "../lib/report/generate-ai-task-pack";
 import { generateDeveloperReport } from "../lib/report/generate-report";
 import type { ScoreResult } from "../lib/scoring/types";
 
@@ -181,6 +182,28 @@ function createReportFileName(url: string): string {
   }
 }
 
+function createAiTaskPackFileName(url: string): string {
+  try {
+    const parsedUrl = new URL(url);
+    return `${parsedUrl.hostname.replace(/^www\./, "")}-ai-task-pack.txt`;
+  } catch {
+    return "local-seo-ai-task-pack.txt";
+  }
+}
+
+function downloadTextFile(content: string, fileName: string) {
+  const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
+  const downloadUrl = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+
+  link.href = downloadUrl;
+  link.download = fileName;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(downloadUrl);
+}
+
 export default function Home() {
   const [form, setForm] = useState<FormState>(initialFormState);
   const [result, setResult] = useState<ScoreResult | null>(null);
@@ -322,16 +345,30 @@ export default function Home() {
       },
       result
     });
-    const blob = new Blob([report], { type: "text/plain;charset=utf-8" });
-    const downloadUrl = URL.createObjectURL(blob);
-    const link = document.createElement("a");
 
-    link.href = downloadUrl;
-    link.download = createReportFileName(form.websiteUrl);
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    URL.revokeObjectURL(downloadUrl);
+    downloadTextFile(report, createReportFileName(form.websiteUrl));
+  }
+
+  function exportAiTaskPack() {
+    if (!result) {
+      return;
+    }
+
+    const taskPack = generateAiTaskPack({
+      page: {
+        keyword: form.keyword,
+        location: form.location,
+        url: form.websiteUrl,
+        title: form.title,
+        metaDescription: form.metaDescription,
+        faqQuestions: form.reportData.faqQuestions,
+        faqItems: form.reportData.faqItems,
+        relatedInternalLinks: form.reportData.relatedInternalLinks
+      },
+      result
+    });
+
+    downloadTextFile(taskPack, createAiTaskPackFileName(form.websiteUrl));
   }
 
   return (
@@ -471,6 +508,9 @@ export default function Home() {
           <div className="result-actions">
             <button onClick={exportDeveloperReport} type="button">
               Export Developer Report
+            </button>
+            <button onClick={exportAiTaskPack} type="button">
+              Export AI Task Pack
             </button>
           </div>
 
