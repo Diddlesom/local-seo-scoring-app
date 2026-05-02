@@ -14,4 +14,9 @@ export type FetchedPageData = {
   phoneNumbers: string[];
   telLinks: string[];
   addressLikeText: string[];
+  faqQuestions: string[];
+  relatedInternalLinks: Array<{
+    text: string;
+    url: string;
+  }>;
 };

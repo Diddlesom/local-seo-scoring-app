@@ -6,6 +6,11 @@ export type ReportPageDetails = {
   url: string;
   title: string;
   metaDescription: string;
+  faqQuestions: string[];
+  relatedInternalLinks: Array<{
+    text: string;
+    url: string;
+  }>;
 };
 
 type GenerateReportInput = {
@@ -21,6 +26,36 @@ const priorityLabels: Record<PrioritizedAction["priority"], string> = {
 
 function getLocation(page: ReportPageDetails): string {
   return page.location || "[target location]";
+}
+
+function getEstimatedEffort(priority: PrioritizedAction["priority"]): string {
+  if (priority === "high") {
+    return "1-2 hours";
+  }
+
+  if (priority === "medium") {
+    return "30-60 minutes";
+  }
+
+  return "10-20 minutes";
+}
+
+function getImplementationRisk(action: string): "low" | "medium" | "high" {
+  const cleanAction = action.toLowerCase();
+
+  if (
+    cleanAction.includes("schema") ||
+    cleanAction.includes("openinghours") ||
+    cleanAction.includes("consolidate")
+  ) {
+    return "medium";
+  }
+
+  if (cleanAction.includes("h1") || cleanAction.includes("title")) {
+    return "medium";
+  }
+
+  return "low";
 }
 
 function listItems(items: string[]): string {
@@ -84,6 +119,24 @@ function getTaskDetails(
   const location = getLocation(page);
 
   if (cleanAction.includes("faqpage schema")) {
+    if (page.faqQuestions.length === 0) {
+      return {
+        whereToImplement:
+          "Do not implement FAQPage schema yet.",
+        whatToChange:
+          "No visible FAQs were detected, so do not add FAQPage schema unless FAQs are added to the page.",
+        example:
+          "First add visible FAQ questions and answers to the page. Then add matching FAQPage JSON-LD.",
+        expectedOutcome:
+          "FAQPage schema is only added when it matches visible page content."
+      };
+    }
+
+    const faqItems = page.faqQuestions.map((question) => ({
+      question,
+      answer: "Replace this with the exact visible answer from the page."
+    }));
+
     return {
       whereToImplement:
         "WordPress SEO plugin custom schema field, theme page head, or page-level JSON-LD injection area.",
@@ -94,16 +147,18 @@ function getTaskDetails(
 {
   "@context": "https://schema.org",
   "@type": "FAQPage",
-  "mainEntity": [
-    {
+  "mainEntity": ${JSON.stringify(
+    faqItems.map((item) => ({
       "@type": "Question",
-      "name": "Do you offer ${page.keyword || "this service"} in ${location}?",
-      "acceptedAnswer": {
+      name: item.question,
+      acceptedAnswer: {
         "@type": "Answer",
-        "text": "Yes, we help customers in ${location} with ${page.keyword || "this service"}. Contact us for advice and availability."
+        text: item.answer
       }
-    }
-  ]
+    })),
+    null,
+    2
+  )}
 }
 </script>`,
       expectedOutcome:
@@ -112,13 +167,25 @@ function getTaskDetails(
   }
 
   if (cleanAction.includes("internal links")) {
+    const detectedLinks =
+      page.relatedInternalLinks.length > 0
+        ? page.relatedInternalLinks
+            .map((link) => `- ${link.text}: ${link.url}`)
+            .join("\n")
+        : "Use real existing URLs from the site. Do not create links to pages that do not exist.";
+
     return {
       whereToImplement:
         "Inside relevant service sections in the main page content.",
       whatToChange:
         "Add contextual links to related service pages using natural anchor text.",
       example:
-        "Example anchors to use where relevant: laptop repair, Mac repair, data recovery, virus removal.",
+        [
+          "Preferred anchor examples: laptop repair, Mac repair, data recovery, virus removal.",
+          "",
+          "Detected related internal URLs:",
+          detectedLinks
+        ].join("\n"),
       expectedOutcome:
         "Visitors and search engines can move more easily between related service pages."
     };
@@ -148,9 +215,9 @@ function getTaskDetails(
       whereToImplement:
         "Existing JSON-LD schema output in the SEO plugin, theme, or page template.",
       whatToChange:
-        "Keep one consistent LocalBusiness block. Check name, URL, phone, address, opening hours, and areaServed.",
+        "Keep one primary LocalBusiness schema block. Remove duplicate/conflicting LocalBusiness blocks from the theme, SEO plugin, or page builder.",
       example:
-        "Remove duplicate/conflicting LocalBusiness blocks and keep the most complete version.",
+        "Keep the version with name, address, telephone, URL, openingHours, geo, and areaServed. Ensure phone/address match visible page content.",
       expectedOutcome:
         "Structured data is clearer, easier to validate, and less likely to contain conflicting business details."
     };
@@ -198,8 +265,8 @@ Recent ${location} repair example: A customer in [area] had [problem]. We [fix].
         "SEO title/meta plugin field or page metadata settings.",
       whatToChange:
         "Rewrite the meta description to include the service, location, benefit, and call to action.",
-      example: `Example meta description:
-Need ${page.keyword || "local service help"} in ${location}? Get clear advice, fast support, and trusted local service. Contact us today for a quote.`,
+      example:
+        "Example meta description:\nNeed computer repair in Ilminster? Get fast, reliable laptop, PC and Mac repairs from Dave at CWC Computers. Call today for friendly local advice.",
       expectedOutcome:
         "The search result snippet becomes clearer and more likely to earn clicks."
     };
@@ -250,6 +317,12 @@ function formatTasks(
         "",
         "Expected outcome:",
         details.expectedOutcome,
+        "",
+        "estimatedEffort:",
+        getEstimatedEffort(action.priority),
+        "",
+        "implementationRisk:",
+        getImplementationRisk(action.action),
         "",
         "Estimated score gain:",
         `+${action.estimatedScoreGain}`

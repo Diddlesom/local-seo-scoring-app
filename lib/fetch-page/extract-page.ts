@@ -212,10 +212,76 @@ function extractAddressLikeText(text: string): string[] {
     .slice(0, 5);
 }
 
+function extractFaqQuestions(
+  text: string,
+  headings: FetchedPageData["headings"]
+): string[] {
+  const headingQuestions = [...headings.h1, ...headings.h2, ...headings.h3];
+  const textQuestions = text
+    .split("\n")
+    .map(cleanText)
+    .filter((line) => line.endsWith("?"));
+
+  return Array.from(
+    new Set(
+      [...headingQuestions, ...textQuestions].filter((line) =>
+        line.endsWith("?")
+      )
+    )
+  ).slice(0, 8);
+}
+
+function extractRelatedInternalLinks(
+  pageUrl: string,
+  html: string
+): FetchedPageData["relatedInternalLinks"] {
+  const baseUrl = new URL(pageUrl);
+  const linkPattern = /<a\b[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi;
+  const relatedWords = [
+    "laptop repair",
+    "mac repair",
+    "data recovery",
+    "virus removal",
+    "repair",
+    "service"
+  ];
+  const links = new Map<string, { text: string; url: string }>();
+  let match = linkPattern.exec(html);
+
+  while (match) {
+    try {
+      const resolvedUrl = new URL(match[1], baseUrl);
+      const text = stripTags(match[2]);
+      const comparable = `${text} ${resolvedUrl.pathname}`.toLowerCase();
+
+      if (
+        resolvedUrl.hostname === baseUrl.hostname &&
+        relatedWords.some((word) => comparable.includes(word))
+      ) {
+        links.set(resolvedUrl.toString(), {
+          text: text || resolvedUrl.pathname,
+          url: resolvedUrl.toString()
+        });
+      }
+    } catch {
+      // Ignore invalid href values.
+    }
+
+    match = linkPattern.exec(html);
+  }
+
+  return Array.from(links.values()).slice(0, 8);
+}
+
 export function extractPageData(url: string, html: string): FetchedPageData {
   const contentHtml = pickContentHtml(html);
   const cleanTextContent = extractCleanText(contentHtml);
   const schemaScripts = extractJsonLd(html);
+  const headings = {
+    h1: extractHeadings(contentHtml, "h1"),
+    h2: extractHeadings(contentHtml, "h2"),
+    h3: extractHeadings(contentHtml, "h3")
+  };
 
   return {
     url,
@@ -224,14 +290,12 @@ export function extractPageData(url: string, html: string): FetchedPageData {
     html: contentHtml,
     cleanText: cleanTextContent,
     bodyText: cleanTextContent,
-    headings: {
-      h1: extractHeadings(contentHtml, "h1"),
-      h2: extractHeadings(contentHtml, "h2"),
-      h3: extractHeadings(contentHtml, "h3")
-    },
+    headings,
     schemaJson: schemaScripts.join("\n\n"),
     phoneNumbers: extractPhoneNumbers(cleanTextContent),
     telLinks: extractTelLinks(html),
-    addressLikeText: extractAddressLikeText(cleanTextContent)
+    addressLikeText: extractAddressLikeText(cleanTextContent),
+    faqQuestions: extractFaqQuestions(cleanTextContent, headings),
+    relatedInternalLinks: extractRelatedInternalLinks(url, html)
   };
 }

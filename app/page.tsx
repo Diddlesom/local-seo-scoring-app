@@ -17,6 +17,19 @@ type FetchedPageData = {
     h3: string[];
   };
   schemaJson: string;
+  faqQuestions: string[];
+  relatedInternalLinks: Array<{
+    text: string;
+    url: string;
+  }>;
+};
+
+type ReportDetectedData = {
+  faqQuestions: string[];
+  relatedInternalLinks: Array<{
+    text: string;
+    url: string;
+  }>;
 };
 
 type FormState = {
@@ -32,7 +45,17 @@ type FormState = {
     h3: string[];
   };
   schemaJson: string;
+  reportData: ReportDetectedData;
 };
+
+type TextFormField =
+  | "keyword"
+  | "location"
+  | "title"
+  | "metaDescription"
+  | "websiteUrl"
+  | "pageContent"
+  | "schemaJson";
 
 const initialFormState: FormState = {
   keyword: "",
@@ -46,7 +69,11 @@ const initialFormState: FormState = {
     h2: [],
     h3: []
   },
-  schemaJson: ""
+  schemaJson: "",
+  reportData: {
+    faqQuestions: [],
+    relatedInternalLinks: []
+  }
 };
 
 const exampleFormState: FormState = {
@@ -76,7 +103,11 @@ const exampleFormState: FormState = {
   "url": "https://example.com/laptop-repair-chard",
   "telephone": "01460 123456",
   "areaServed": "Chard, Somerset"
-}`
+}`,
+  reportData: {
+    faqQuestions: [],
+    relatedInternalLinks: []
+  }
 };
 
 const categoryLabels: Record<keyof ScoreResult["categoryScores"], string> = {
@@ -148,7 +179,7 @@ export default function Home() {
   const [isFetching, setIsFetching] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
-  function updateField(field: keyof FormState, value: string) {
+  function updateField(field: TextFormField, value: string) {
     setForm((current) => ({
       ...current,
       [field]: value
@@ -206,7 +237,11 @@ export default function Home() {
         metaDescription: pageData.metaDescription,
         pageContent: pageData.cleanText || pageData.bodyText || pageData.html,
         headings: pageData.headings,
-        schemaJson: pageData.schemaJson
+        schemaJson: pageData.schemaJson,
+        reportData: {
+          faqQuestions: pageData.faqQuestions ?? [],
+          relatedInternalLinks: pageData.relatedInternalLinks ?? []
+        }
       }));
       setFetchMessage("URL fetched. Review the fields, then score the page.");
     } catch (fetchError) {
@@ -269,7 +304,9 @@ export default function Home() {
         location: form.location,
         url: form.websiteUrl,
         title: form.title,
-        metaDescription: form.metaDescription
+        metaDescription: form.metaDescription,
+        faqQuestions: form.reportData.faqQuestions,
+        relatedInternalLinks: form.reportData.relatedInternalLinks
       },
       result
     });
