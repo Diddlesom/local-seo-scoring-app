@@ -252,7 +252,7 @@ function simplifyBenchmarkGap(gap: string): string {
   }
 
   if (cleanGap.includes("more headings")) {
-    return "Page structure has fewer service subheadings";
+    return "Fewer service subheadings than competitors";
   }
 
   if (cleanGap.includes("schema")) {
@@ -389,6 +389,8 @@ function formatBenchmarkInsights(insights?: BenchmarkInsights | null): string {
     `- ${cleanReportText(insights.topRecommendedNextStep)}`,
     "",
     "Priority actions based on competitors:",
+    "Recommended improvements are based on competitor comparison. Focus on the top action first for the fastest impact.",
+    "",
     formatBenchmarkActionGroups(insights),
     "",
     "Competitor summary table:",

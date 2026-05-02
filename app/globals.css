@@ -294,6 +294,11 @@ nav a:hover {
   gap: 12px;
 }
 
+.action-helper {
+  color: #6c757d;
+  font-size: 14px;
+}
+
 .benchmark-action-groups > li {
   background: rgba(255, 255, 255, 0.72);
   border: 1px solid #eadfbf;

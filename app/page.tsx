@@ -310,7 +310,7 @@ function simplifyBenchmarkGap(gap: string): string {
   }
 
   if (cleanGap.includes("more headings")) {
-    return "Page structure has fewer service subheadings";
+    return "Fewer service subheadings than competitors";
   }
 
   if (cleanGap.includes("schema")) {
@@ -515,6 +515,17 @@ function buildBenchmarkInsights({
     trustGap > 0 ? "trust signals" : "",
     serviceGap > 0 ? "service coverage" : ""
   ].filter(Boolean);
+  const competitiveAreas = [
+    contentGap <= 0 ? "content depth" : "",
+    trustGap <= 0 ? "trust signals" : "",
+    serviceGap <= 0 ? "service coverage" : ""
+  ].filter(Boolean);
+  const summaryText =
+    belowAverageAreas.length > 0 && competitiveAreas.length > 0
+      ? `Your page is competitive in ${competitiveAreas.join(" and ")}, but weaker in ${belowAverageAreas.join(" and ")}.`
+      : belowAverageAreas.length > 0
+        ? `Your page is weaker than competitors in ${belowAverageAreas.join(" and ")}.`
+        : `Your page is competitive in ${competitiveAreas.join(" and ")}.`;
   const priorityActionGroups: BenchmarkInsights["priorityActionGroups"] = {
     contentDepth: [
       `Your page: ${targetResult.signals.wordCount} words`,
@@ -575,22 +586,20 @@ function buildBenchmarkInsights({
           ? "Below competitor average."
           : "Competitive with competitor average.",
       summary:
-        belowAverageAreas.length > 0
-          ? `Your page is behind competitors on ${belowAverageAreas.join(", ")}.`
-          : "Your page is broadly competitive against the current competitor set."
+        summaryText
     },
     commonPatterns: [
       ...majorityTopics.map(
         (topic) =>
-          `${formatCompetitorCount(topic.count, competitors.length)} mention ${topic.value}.`
+          `${topic.value} is commonly mentioned (${formatCompetitorCount(topic.count, competitors.length)}).`
       ),
       ...majoritySchemaTypes.map(
         (schema) =>
-          `${formatCompetitorCount(schema.count, competitors.length)} use ${schema.value} schema.`
+          `${schema.value} schema is widely used (${formatCompetitorCount(schema.count, competitors.length)}).`
       ),
       ...majorityTrustSignals.map(
         (signal) =>
-          `${formatCompetitorCount(signal.count, competitors.length)} show ${signal.value.toLowerCase()}.`
+          `${signal.value} appears consistently as a trust signal (${formatCompetitorCount(signal.count, competitors.length)}).`
       )
     ].slice(0, 8),
     majoritySignals: [
@@ -857,6 +866,10 @@ function BenchmarkInsightsPanel({
 
       <section className="insight-block highlight-block">
         <h3>Priority actions based on competitors</h3>
+        <p className="action-helper">
+          Recommended improvements are based on competitor comparison. Focus on
+          the top action first for the fastest impact.
+        </p>
         <ol className="benchmark-action-groups">
           {actionGroups.map(([label, actions]) => (
             <li key={label}>
