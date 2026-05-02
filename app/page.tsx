@@ -4,6 +4,14 @@ import { useState } from "react";
 import type { FormEvent } from "react";
 import type { ScoreResult } from "../lib/scoring/types";
 
+type FetchedPageData = {
+  title: string;
+  metaDescription: string;
+  html: string;
+  bodyText: string;
+  schemaJson: string;
+};
+
 type FormState = {
   keyword: string;
   location: string;
@@ -77,6 +85,8 @@ export default function Home() {
   const [form, setForm] = useState<FormState>(initialFormState);
   const [result, setResult] = useState<ScoreResult | null>(null);
   const [error, setError] = useState("");
+  const [fetchMessage, setFetchMessage] = useState("");
+  const [isFetching, setIsFetching] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
   function updateField(field: keyof FormState, value: string) {
@@ -89,7 +99,57 @@ export default function Home() {
   function loadExample() {
     setForm(exampleFormState);
     setError("");
+    setFetchMessage("");
     setResult(null);
+  }
+
+  async function handleFetchUrl() {
+    setError("");
+    setFetchMessage("");
+    setResult(null);
+
+    if (!form.websiteUrl.trim()) {
+      setError("Please enter a valid URL before fetching.");
+      return;
+    }
+
+    setIsFetching(true);
+
+    try {
+      const response = await fetch("/api/fetch-page", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          url: form.websiteUrl
+        })
+      });
+      const data = (await response.json()) as
+        | FetchedPageData
+        | { error?: string };
+
+      if (!response.ok || "error" in data) {
+        throw new Error(data.error ?? "The page could not be fetched.");
+      }
+
+      setForm((current) => ({
+        ...current,
+        title: data.title,
+        metaDescription: data.metaDescription,
+        pageContent: data.html || data.bodyText,
+        schemaJson: data.schemaJson
+      }));
+      setFetchMessage("URL fetched. Review the fields, then score the page.");
+    } catch (fetchError) {
+      setError(
+        fetchError instanceof Error
+          ? fetchError.message
+          : "The page could not be fetched."
+      );
+    } finally {
+      setIsFetching(false);
+    }
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -175,15 +235,25 @@ export default function Home() {
 
           <label>
             URL
-            <input
-              name="websiteUrl"
-              onChange={(event) =>
-                updateField("websiteUrl", event.target.value)
-              }
-              placeholder="https://example.com/service-page"
-              type="url"
-              value={form.websiteUrl}
-            />
+            <span className="url-row">
+              <input
+                name="websiteUrl"
+                onChange={(event) =>
+                  updateField("websiteUrl", event.target.value)
+                }
+                placeholder="https://example.com/service-page"
+                type="url"
+                value={form.websiteUrl}
+              />
+              <button
+                className="secondary-button"
+                disabled={isFetching}
+                onClick={handleFetchUrl}
+                type="button"
+              >
+                {isFetching ? "Fetching..." : "Fetch URL"}
+              </button>
+            </span>
           </label>
         </div>
 
@@ -236,6 +306,7 @@ export default function Home() {
         </div>
 
         {error ? <p className="error">{error}</p> : null}
+        {fetchMessage ? <p className="success">{fetchMessage}</p> : null}
       </form>
 
       {result ? (

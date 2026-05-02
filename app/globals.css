@@ -121,6 +121,12 @@ button:disabled {
   gap: 12px;
 }
 
+.url-row {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
 .secondary-button {
   background: #ffffff;
   border: 1px solid #2d6a4f;
@@ -129,6 +135,12 @@ button:disabled {
 
 .error {
   color: #a33824;
+  font-weight: 700;
+  margin: 0;
+}
+
+.success {
+  color: #2d6a4f;
   font-weight: 700;
   margin: 0;
 }
@@ -212,7 +224,8 @@ li {
 @media (max-width: 720px) {
   .form-grid,
   .score-summary,
-  .result-grid {
+  .result-grid,
+  .url-row {
     grid-template-columns: 1fr;
   }
 
