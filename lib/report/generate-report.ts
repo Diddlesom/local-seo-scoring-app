@@ -28,8 +28,35 @@ const priorityLabels: Record<PrioritizedAction["priority"], string> = {
   low: "Low priority"
 };
 
+function decodeHtmlEntities(text: string): string {
+  return text
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&mdash;/g, "—")
+    .replace(/&ndash;/g, "–")
+    .replace(/&rsquo;/g, "’")
+    .replace(/&lsquo;/g, "‘")
+    .replace(/&rdquo;/g, "”")
+    .replace(/&ldquo;/g, "“")
+    .replace(/&#39;/g, "'")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&#(\d+);/g, (_entity, code) =>
+      String.fromCodePoint(Number(code))
+    )
+    .replace(/&#x([0-9a-f]+);/gi, (_entity, code) =>
+      String.fromCodePoint(parseInt(code, 16))
+    );
+}
+
+function cleanReportText(text: string): string {
+  return decodeHtmlEntities(text).replace(/\s+/g, " ").trim();
+}
+
 function getLocation(page: ReportPageDetails): string {
-  return page.location || "[target location]";
+  return page.location ? cleanReportText(page.location) : "[target location]";
 }
 
 function getEstimatedEffort(priority: PrioritizedAction["priority"]): string {
@@ -134,8 +161,10 @@ function getReportFaqItems(page: ReportPageDetails): Array<{
       }));
 
   return faqItems.map((item) => ({
-    question: item.question,
-    answer: item.answer || "Replace this with the exact visible answer from the page."
+    question: cleanReportText(item.question),
+    answer: item.answer
+      ? cleanReportText(item.answer)
+      : "Replace this with the exact visible answer from the page."
   }));
 }
 
@@ -161,7 +190,7 @@ function listItems(items: string[]): string {
     return "- None found";
   }
 
-  return items.map((item) => `- ${item}`).join("\n");
+  return items.map((item) => `- ${cleanReportText(item)}`).join("\n");
 }
 
 function getDoNotChangeItems(result: ScoreResult): string[] {
@@ -174,7 +203,9 @@ function getDoNotChangeItems(result: ScoreResult): string[] {
   }
 
   if (result.signals.headings.h1.length > 0) {
-    items.push(`H1 is already present: ${result.signals.headings.h1[0]}`);
+    items.push(
+      `H1 is already present: ${cleanReportText(result.signals.headings.h1[0])}`
+    );
   }
 
   if (result.signals.headings.h2.length > 0) {
@@ -266,7 +297,7 @@ function getTaskDetails(
     const detectedLinks =
       strongLinks.length > 0
         ? strongLinks
-            .map((link) => `- ${link.text}: ${link.url}`)
+            .map((link) => `- ${cleanReportText(link.text)}: ${link.url}`)
             .join("\n")
         : "Use real existing service/location URLs from the site. Do not invent pages.";
 
@@ -408,19 +439,19 @@ function formatTasks(
         `Task ${index + 1}`,
         "",
         "Task:",
-        action.action,
+        cleanReportText(action.action),
         "",
         "Where to implement:",
-        details.whereToImplement,
+        cleanReportText(details.whereToImplement),
         "",
         "What to change:",
-        details.whatToChange,
+        cleanReportText(details.whatToChange),
         "",
         "Example code or copy:",
         details.example,
         "",
         "Expected outcome:",
-        details.expectedOutcome,
+        cleanReportText(details.expectedOutcome),
         "",
         "estimatedEffort:",
         getEstimatedEffort(action.priority),
@@ -445,9 +476,11 @@ export function generateDeveloperReport({
     ...getAssistantInstructions(),
     "",
     "PAGE DETAILS",
-    `- Target keyword: ${page.keyword || "Not provided"}`,
-    `- Location: ${page.location || "Not provided"}`,
+    `- Target keyword: ${page.keyword ? cleanReportText(page.keyword) : "Not provided"}`,
+    `- Location: ${page.location ? cleanReportText(page.location) : "Not provided"}`,
     `- URL: ${page.url || "Not provided"}`,
+    `- Page title: ${page.title ? cleanReportText(page.title) : "Not provided"}`,
+    `- Meta description: ${page.metaDescription ? cleanReportText(page.metaDescription) : "Not provided"}`,
     `- Score / grade: ${result.totalScore}/100 (${result.grade})`,
     "",
     "DO NOT CHANGE",
