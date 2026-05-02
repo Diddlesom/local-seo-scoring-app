@@ -386,28 +386,6 @@ function groupPriorityActions(actions: string[]): BenchmarkInsights["priorityAct
   return groups;
 }
 
-function actionFromGap(gap: string): string {
-  const cleanGap = gap.toLowerCase();
-
-  if (cleanGap.includes("content depth")) {
-    return "Increase content depth with more useful service detail and local proof.";
-  }
-
-  if (cleanGap.includes("trust") || cleanGap.includes("testimonial")) {
-    return "Improve trust signals with visible reviews, testimonials, guarantees, or named expert proof.";
-  }
-
-  if (cleanGap.includes("coverage")) {
-    return `Expand service coverage for ${gap.replace(/^Missing\s+/i, "").replace(/\s+coverage$/i, "")}.`;
-  }
-
-  if (cleanGap.includes("schema") || cleanGap.includes("subheadings")) {
-    return `Improve page structure: ${gap}.`;
-  }
-
-  return `Address competitor gap: ${gap}.`;
-}
-
 function getRelativeGap(targetValue: number, averageValue: number): number {
   if (averageValue <= 0) {
     return targetValue <= 0 ? 0 : -1;
@@ -537,20 +515,38 @@ function buildBenchmarkInsights({
     trustGap > 0 ? "trust signals" : "",
     serviceGap > 0 ? "service coverage" : ""
   ].filter(Boolean);
-  const priorityActions = uniqueItems([
-    ...(targetResult.signals.wordCount < averageWordCount
-      ? [
-          `Expand content depth toward the competitor average of ${averageWordCount} words with useful service and local detail.`
-        ]
-      : []),
-    ...missingMajorityTopics,
-    ...missingMajorityTrustSignals,
-    ...missingMajoritySchemaTypes,
-    ...keyGaps.map(actionFromGap)
-  ]).slice(0, 8);
-  const priorityActionGroups = groupPriorityActions(priorityActions);
+  const priorityActionGroups: BenchmarkInsights["priorityActionGroups"] = {
+    contentDepth: [
+      `Your page: ${targetResult.signals.wordCount} words`,
+      `Competitor average: ${averageWordCount} words`,
+      "Add more service detail and local relevance"
+    ],
+    trustSignals: [
+      "Add testimonials (used by competitors)",
+      "Add customer-style review wording",
+      "Add independent business messaging",
+      "Add family-run or guarantee messaging if accurate"
+    ],
+    serviceCoverage: [
+      "Add a computer repair section",
+      "Add a pc repair section",
+      "Consider mac repair and SSD upgrade if relevant"
+    ],
+    pageStructure: [
+      "Add more service subheadings",
+      "Break content into clearer sections"
+    ]
+  };
+  const priorityActions = [
+    ...priorityActionGroups.contentDepth,
+    ...priorityActionGroups.trustSignals,
+    ...priorityActionGroups.serviceCoverage,
+    ...priorityActionGroups.pageStructure
+  ];
 
   return {
+    targetWordCount: targetResult.signals.wordCount,
+    averageWordCount,
     overallCompetitivePosition: [
       contentGap > 0
         ? "Content depth is below the competitor average."
@@ -861,24 +857,18 @@ function BenchmarkInsightsPanel({
 
       <section className="insight-block highlight-block">
         <h3>Priority actions based on competitors</h3>
-        {insights.priorityActions.length > 0 ? (
-          <div className="benchmark-action-groups">
-            {actionGroups.map(([label, actions]) =>
-              actions.length > 0 ? (
-                <div key={label}>
-                  <strong>{label}</strong>
-                  <ol>
-                    {actions.map((action) => (
-                      <li key={action}>{action}</li>
-                    ))}
-                  </ol>
-                </div>
-              ) : null
-            )}
-          </div>
-        ) : (
-          <p className="empty">No benchmark-driven priority actions found.</p>
-        )}
+        <ol className="benchmark-action-groups">
+          {actionGroups.map(([label, actions]) => (
+            <li key={label}>
+              <strong>{label}</strong>
+              <ul>
+                {actions.map((action) => (
+                  <li key={action}>{action}</li>
+                ))}
+              </ul>
+            </li>
+          ))}
+        </ol>
       </section>
 
       <section className="insight-block summary-table-block">

@@ -453,29 +453,27 @@ function formatBenchmarkInsightsContext(
 }
 
 function formatBenchmarkActionGroups(insights: BenchmarkInsights): string[] {
-  const groups = [
-    ["Increase content depth", insights.priorityActionGroups.contentDepth],
-    ["Improve trust signals", insights.priorityActionGroups.trustSignals],
-    ["Expand service coverage", insights.priorityActionGroups.serviceCoverage],
-    ["Improve page structure", insights.priorityActionGroups.pageStructure]
-  ] as const;
-  const output: string[] = [];
-
-  groups.forEach(([label, actions]) => {
-    if (actions.length === 0) {
-      return;
-    }
-
-    output.push(label);
-    actions.forEach((action, index) => {
-      output.push(`${index + 1}. ${cleanText(action)}`);
-    });
-    output.push("");
-  });
-
-  return output.length
-    ? output
-    : ["No benchmark-driven priority actions found."];
+  return [
+    "1. Increase content depth",
+    `- Your page: ${insights.targetWordCount} words`,
+    `- Competitor average: ${insights.averageWordCount} words`,
+    "- Add more service detail and local relevance",
+    "",
+    "2. Improve trust signals",
+    "- Add testimonials (used by competitors)",
+    "- Add customer-style review wording",
+    "- Add independent business messaging",
+    "- Add family-run or guarantee messaging if accurate",
+    "",
+    "3. Expand service coverage",
+    "- Add a computer repair section",
+    "- Add a pc repair section",
+    "- Consider mac repair and SSD upgrade if relevant",
+    "",
+    "4. Improve page structure",
+    "- Add more service subheadings",
+    "- Break content into clearer sections"
+  ];
 }
 
 export function generateAiTaskPack({

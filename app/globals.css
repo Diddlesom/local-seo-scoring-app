@@ -294,7 +294,7 @@ nav a:hover {
   gap: 12px;
 }
 
-.benchmark-action-groups div {
+.benchmark-action-groups > li {
   background: rgba(255, 255, 255, 0.72);
   border: 1px solid #eadfbf;
   border-radius: 12px;
@@ -306,6 +306,10 @@ nav a:hover {
   display: block;
   font-size: 14px;
   margin-bottom: 8px;
+}
+
+.benchmark-action-groups ul {
+  margin: 0;
 }
 
 .highlight-block {
