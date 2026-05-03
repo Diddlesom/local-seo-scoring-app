@@ -827,6 +827,50 @@ function formatFastAction(
   return actionText;
 }
 
+function isInternalLinkAction(action: PrioritizedAction | null): boolean {
+  return action
+    ? cleanText(action.action).toLowerCase().includes("internal links")
+    : false;
+}
+
+function generateFastInternalLinkTaskPack({
+  page
+}: {
+  page: ReportPageDetails;
+}): string {
+  const link = getInternalLinkRecommendations(page).highConfidence[0];
+  const anchorText = link ? cleanText(link.text) : "No high-confidence link found.";
+  const destinationUrl = link ? link.url : "Do not add a link.";
+
+  return [
+    "You are editing the live WordPress site only.",
+    "",
+    "Task: Add ONE internal link to the target page.",
+    "",
+    `Target page: ${page.url || "Not provided"}`,
+    "",
+    "Add this one internal link once.",
+    anchorText,
+    destinationUrl,
+    "",
+    "Where:",
+    "Add it in the most relevant existing section only.",
+    "",
+    "Rules:",
+    "",
+    "* Do not add any other links.",
+    "* Do not edit unrelated sections.",
+    "* Do not scan the full site.",
+    "* Do not check rejected links.",
+    "* Stop if this cannot be done in 30 browser steps.",
+    "",
+    "Output:",
+    "",
+    "* Confirm where the link was added.",
+    "* Do not continue."
+  ].join("\n");
+}
+
 function generateFastAiTaskPack({
   page,
   result
@@ -835,6 +879,10 @@ function generateFastAiTaskPack({
   result: ScoreResult;
 }): string {
   const action = getHighestPriorityAction(result.prioritizedActions);
+
+  if (isInternalLinkAction(action)) {
+    return generateFastInternalLinkTaskPack({ page });
+  }
 
   return [
     "LOCAL SEO AI TASK PACK",
