@@ -33,12 +33,16 @@ const executionModeConfig: Record<ExecutionMode, ExecutionModeConfig> = {
   fast: {
     label: "Fast",
     summary:
-      "Complete the smallest useful set of edits first. Prioritise speed, low-risk changes, and visible improvements.",
+      "Use this mode for small WordPress edits only.",
     rules: [
-      "Use the fastest safe implementation path.",
-      "Prefer copy edits, metadata updates, internal links, and simple schema fixes.",
-      "Skip low-priority work unless it directly supports a high-priority task.",
-      "Stop after the first few meaningful tasks are complete."
+      "Use this mode for small WordPress edits only.",
+      "Do not scan the full page.",
+      "Do not inspect unrelated pages.",
+      "Do not run broad schema checks.",
+      "Do not click every link unless specifically required.",
+      "Validate only the changed item.",
+      "Stop immediately after confirming the change.",
+      "Aim to complete in fewer than 30 browser steps."
     ],
     taskIntro:
       "Fast mode includes the highest-impact tasks only. Complete them in order and stop when they are done.",
@@ -515,18 +519,31 @@ function getCodeOrContent(action: PrioritizedAction, page: ReportPageDetails): s
   return "No copy-paste content available. Create the smallest practical WordPress change needed for this task.";
 }
 
-function getDoNotTouchList(action: PrioritizedAction): string[] {
+function getDoNotTouchList(
+  action: PrioritizedAction,
+  executionMode: ExecutionMode
+): string[] {
   const cleanAction = action.action.toLowerCase();
   const items = [
     "Do not work on any other task from this pack.",
     "Do not rewrite the full page.",
-    "Do not change scoring logic.",
+    "Do not change unrelated WordPress settings or site behaviour.",
     "Do not invent facts, reviews, case studies, services, locations, or claims."
   ];
 
   if (cleanAction.includes("internal links")) {
     items.push("Do not create links to pages that do not exist.");
     items.push("Do not edit unrelated page sections.");
+
+    if (executionMode === "fast") {
+      items.push(
+        "Do not create new snippets unless the page already uses a snippet for this exact task."
+      );
+      items.push(
+        "Prefer editing the existing relevant page content or existing relevant snippet only."
+      );
+      items.push("Do not inspect unrelated pages.");
+    }
   }
 
   if (cleanAction.includes("schema")) {
@@ -540,7 +557,10 @@ function getDoNotTouchList(action: PrioritizedAction): string[] {
   return items;
 }
 
-function getValidationSteps(action: PrioritizedAction): string[] {
+function getValidationSteps(
+  action: PrioritizedAction,
+  executionMode: ExecutionMode
+): string[] {
   const cleanAction = action.action.toLowerCase();
 
   if (cleanAction.includes("faqpage schema")) {
@@ -552,6 +572,14 @@ function getValidationSteps(action: PrioritizedAction): string[] {
   }
 
   if (cleanAction.includes("internal links")) {
+    if (executionMode === "fast") {
+      return [
+        "Confirm the approved links are present.",
+        "Confirm rejected/risky links were not added.",
+        "Stop after a short summary."
+      ];
+    }
+
     return [
       "Click each new link and confirm it opens an existing page.",
       "Confirm only relevant page sections were edited.",
@@ -599,7 +627,8 @@ function getStopCondition(action: PrioritizedAction): string {
 function formatTask(
   action: PrioritizedAction,
   index: number,
-  page: ReportPageDetails
+  page: ReportPageDetails,
+  executionMode: ExecutionMode
 ): string {
   return [
     `TASK ${index + 1}`,
@@ -615,10 +644,10 @@ function formatTask(
     getCodeOrContent(action, page),
     "",
     "Do not touch list:",
-    ...getDoNotTouchList(action).map((item) => `- ${item}`),
+    ...getDoNotTouchList(action, executionMode).map((item) => `- ${item}`),
     "",
     "Validation steps:",
-    ...getValidationSteps(action).map((step) => `- ${step}`),
+    ...getValidationSteps(action, executionMode).map((step) => `- ${step}`),
     "",
     "Stop condition:",
     getStopCondition(action)
@@ -769,7 +798,7 @@ export function generateAiTaskPack({
     "LOCAL SEO AI TASK PACK",
     "",
     "EXECUTION MODE",
-    `- Mode: ${mode.label}`,
+    `- Mode: ${mode.label.toUpperCase()}`,
     `- Approach: ${mode.summary}`,
     "",
     "MODE RULES",
@@ -783,6 +812,13 @@ export function generateAiTaskPack({
     "- Before making changes, explain the plan.",
     "- After making changes, stop and summarise.",
     "- Do not continue to the next task until approved.",
+    "",
+    "WORKING CONTEXT",
+    "- You are editing the live WordPress site only.",
+    "- Do not edit the local app project.",
+    "- Do not mention Git, ZIP files, npm, Codex, Vercel, or project files.",
+    "- Do not attempt to access localhost or file:// URLs.",
+    "- Work only inside WordPress/admin/browser tools.",
     "",
     "PAGE CONTEXT",
     `- Target keyword: ${page.keyword ? cleanText(page.keyword) : "Not provided"}`,
@@ -802,7 +838,9 @@ export function generateAiTaskPack({
     "",
     prioritizedActions.length
       ? prioritizedActions
-          .map((action, index) => formatTask(action, index, page))
+          .map((action, index) =>
+            formatTask(action, index, page, executionMode)
+          )
           .join("\n\n---\n\n")
       : "No prioritized actions were generated."
   ].join("\n");
