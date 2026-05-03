@@ -19,6 +19,12 @@ const priorityLabels: Record<PrioritizedAction["priority"], string> = {
   low: "LOW"
 };
 
+const priorityRank: Record<PrioritizedAction["priority"], number> = {
+  high: 0,
+  medium: 1,
+  low: 2
+};
+
 export type ExecutionMode = "fast" | "balanced" | "thorough";
 
 type ExecutionModeConfig = {
@@ -782,6 +788,65 @@ function formatBenchmarkActionGroups(insights: BenchmarkInsights): string[] {
   ]);
 }
 
+function getHighestPriorityAction(
+  actions: PrioritizedAction[]
+): PrioritizedAction | null {
+  return (
+    actions
+      .map((action, index) => ({ action, index }))
+      .sort(
+        (first, second) =>
+          priorityRank[first.action.priority] -
+            priorityRank[second.action.priority] || first.index - second.index
+      )[0]?.action ?? null
+  );
+}
+
+function formatOptionalLine(label: string, value: string): string[] {
+  const cleanValue = cleanText(value);
+
+  return cleanValue ? [`${label}: ${cleanValue}`] : [];
+}
+
+function generateFastAiTaskPack({
+  page,
+  result
+}: {
+  page: ReportPageDetails;
+  result: ScoreResult;
+}): string {
+  const action = getHighestPriorityAction(result.prioritizedActions);
+
+  return [
+    "LOCAL SEO AI TASK PACK",
+    "",
+    "You are editing the live WordPress site only.",
+    "",
+    "Mode: FAST",
+    `Target page: ${page.url || "Not provided"}`,
+    ...formatOptionalLine("Keyword", page.keyword),
+    ...formatOptionalLine("Location", page.location),
+    "",
+    "Complete this one task only:",
+    "",
+    action
+      ? cleanText(action.action)
+      : "No prioritized action was generated for this page.",
+    "",
+    "Rules:",
+    "",
+    "* Edit only what is required for this task.",
+    "* Do not change anything unrelated.",
+    "* Do not create duplicate schema or duplicate content.",
+    "* Do not inspect unrelated pages or settings.",
+    "",
+    "Output:",
+    "",
+    "* Confirm exactly what changed.",
+    "* Show the edited snippet or changed section only."
+  ].join("\n");
+}
+
 export function generateAiTaskPack({
   page,
   result,
@@ -789,6 +854,10 @@ export function generateAiTaskPack({
   benchmarkInsights,
   executionMode = "balanced"
 }: GenerateAiTaskPackInput): string {
+  if (executionMode === "fast") {
+    return generateFastAiTaskPack({ page, result });
+  }
+
   const mode = executionModeConfig[executionMode];
   const prioritizedActions = mode.taskLimit
     ? result.prioritizedActions.slice(0, mode.taskLimit)
