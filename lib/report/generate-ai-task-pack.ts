@@ -808,6 +808,25 @@ function formatOptionalLine(label: string, value: string): string[] {
   return cleanValue ? [`${label}: ${cleanValue}`] : [];
 }
 
+function formatFastAction(
+  action: PrioritizedAction | null,
+  page: ReportPageDetails
+): string {
+  if (!action) {
+    return "No prioritized action was generated for this page.";
+  }
+
+  const actionText = cleanText(action.action);
+
+  if (/add areaserved to localbusiness schema/i.test(actionText)) {
+    const location = cleanText(page.location) || "the target location";
+
+    return `Find the existing LocalBusiness JSON-LD schema block and add exactly this field: \`"areaServed": "${location}"\`.`;
+  }
+
+  return actionText;
+}
+
 function generateFastAiTaskPack({
   page,
   result
@@ -827,11 +846,17 @@ function generateFastAiTaskPack({
     ...formatOptionalLine("Keyword", page.keyword),
     ...formatOptionalLine("Location", page.location),
     "",
+    "Execution limit:",
+    "",
+    "* Complete in 30 browser steps or fewer.",
+    "* Do not explain a plan first.",
+    "* Do not inspect unrelated settings, plugins, pages, menus, links, or schema sources.",
+    "* If the exact edit location is found, make the change immediately and stop.",
+    "* If the edit location is not found within 30 steps, stop and report what was checked.",
+    "",
     "Complete this one task only:",
     "",
-    action
-      ? cleanText(action.action)
-      : "No prioritized action was generated for this page.",
+    formatFastAction(action, page),
     "",
     "Rules:",
     "",
