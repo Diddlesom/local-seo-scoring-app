@@ -959,10 +959,72 @@ button:disabled {
 }
 
 .result-actions {
+  align-items: center;
   display: flex;
   flex-wrap: wrap;
   gap: 12px;
   justify-content: flex-end;
+}
+
+.execution-mode-toggle {
+  border: 0;
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  min-width: 255px;
+  padding: 0;
+}
+
+.execution-mode-toggle legend {
+  color: #607166;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  line-height: 1.2;
+  padding: 0;
+  text-transform: uppercase;
+}
+
+.execution-mode-options {
+  background: #eef7f0;
+  border: 1px solid rgba(34, 197, 94, 0.22);
+  border-radius: 14px;
+  display: grid;
+  gap: 4px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  padding: 4px;
+}
+
+.execution-mode-option {
+  align-items: center;
+  border-radius: 10px;
+  color: #415247;
+  cursor: pointer;
+  display: flex;
+  font-size: 13px;
+  font-weight: 900;
+  justify-content: center;
+  min-height: 38px;
+  padding: 8px 10px;
+  text-align: center;
+  transition:
+    background 160ms ease,
+    box-shadow 160ms ease,
+    color 160ms ease;
+}
+
+.execution-mode-option input {
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+  position: absolute;
+  width: 1px;
+}
+
+.execution-mode-option.selected {
+  background: #ffffff;
+  box-shadow: 0 8px 18px rgba(18, 32, 26, 0.08);
+  color: #145c39;
 }
 
 .recommendation-groups {
@@ -1054,6 +1116,11 @@ li {
 
   .result-actions {
     justify-content: stretch;
+  }
+
+  .execution-mode-toggle {
+    min-width: 0;
+    width: 100%;
   }
 }
 

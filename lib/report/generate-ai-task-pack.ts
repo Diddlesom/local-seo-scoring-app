@@ -10,12 +10,66 @@ type GenerateAiTaskPackInput = {
   result: ScoreResult;
   benchmark?: BenchmarkCompetitor[];
   benchmarkInsights?: BenchmarkInsights | null;
+  executionMode?: ExecutionMode;
 };
 
 const priorityLabels: Record<PrioritizedAction["priority"], string> = {
   high: "HIGH",
   medium: "MEDIUM",
   low: "LOW"
+};
+
+export type ExecutionMode = "fast" | "balanced" | "thorough";
+
+type ExecutionModeConfig = {
+  label: string;
+  summary: string;
+  rules: string[];
+  taskIntro: string;
+  taskLimit?: number;
+};
+
+const executionModeConfig: Record<ExecutionMode, ExecutionModeConfig> = {
+  fast: {
+    label: "Fast",
+    summary:
+      "Complete the smallest useful set of edits first. Prioritise speed, low-risk changes, and visible improvements.",
+    rules: [
+      "Use the fastest safe implementation path.",
+      "Prefer copy edits, metadata updates, internal links, and simple schema fixes.",
+      "Skip low-priority work unless it directly supports a high-priority task.",
+      "Stop after the first few meaningful tasks are complete."
+    ],
+    taskIntro:
+      "Fast mode includes the highest-impact tasks only. Complete them in order and stop when they are done.",
+    taskLimit: 3
+  },
+  balanced: {
+    label: "Balanced",
+    summary:
+      "Use the standard controlled implementation workflow. Balance impact, effort, and validation.",
+    rules: [
+      "Follow each task exactly as written.",
+      "Make practical improvements without expanding scope.",
+      "Validate each completed change before moving on.",
+      "Ask for approval before any risky or uncertain change."
+    ],
+    taskIntro:
+      "Balanced mode includes the standard prioritized task list. Complete one task at a time."
+  },
+  thorough: {
+    label: "Thorough",
+    summary:
+      "Use a deeper implementation workflow. Add extra checks, evidence review, and validation before finalising changes.",
+    rules: [
+      "Review the relevant page content, metadata, schema, and competitor context before editing.",
+      "Document assumptions and ask for confirmation where business facts are missing.",
+      "Use the strongest validation path available for each task.",
+      "After each task, record what changed, where it changed, and how it was checked."
+    ],
+    taskIntro:
+      "Thorough mode includes the full prioritized task list with extra care on evidence, validation, and assumptions."
+  }
 };
 
 function decodeHtmlEntities(text: string): string {
@@ -703,10 +757,23 @@ export function generateAiTaskPack({
   page,
   result,
   benchmark,
-  benchmarkInsights
+  benchmarkInsights,
+  executionMode = "balanced"
 }: GenerateAiTaskPackInput): string {
+  const mode = executionModeConfig[executionMode];
+  const prioritizedActions = mode.taskLimit
+    ? result.prioritizedActions.slice(0, mode.taskLimit)
+    : result.prioritizedActions;
+
   return [
     "LOCAL SEO AI TASK PACK",
+    "",
+    "EXECUTION MODE",
+    `- Mode: ${mode.label}`,
+    `- Approach: ${mode.summary}`,
+    "",
+    "MODE RULES",
+    ...mode.rules.map((rule) => `- ${rule}`),
     "",
     "STRICT RULES",
     "- Work on ONE task only.",
@@ -731,8 +798,10 @@ export function generateAiTaskPack({
     formatBenchmarkContext(benchmark),
     "",
     "TASKS",
-    result.prioritizedActions.length
-      ? result.prioritizedActions
+    mode.taskIntro,
+    "",
+    prioritizedActions.length
+      ? prioritizedActions
           .map((action, index) => formatTask(action, index, page))
           .join("\n\n---\n\n")
       : "No prioritized actions were generated."

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
 import { generateAiTaskPack } from "../lib/report/generate-ai-task-pack";
+import type { ExecutionMode } from "../lib/report/generate-ai-task-pack";
 import { generateDeveloperReport } from "../lib/report/generate-report";
 import type {
   BenchmarkCompetitor,
@@ -115,33 +116,18 @@ const initialCaseStudyState: CaseStudyState = {
 };
 
 const exampleFormState: FormState = {
-  keyword: "Laptop Repair Chard",
-  location: "Chard, Somerset",
-  title: "Laptop Repair Chard | Fast Computer Repairs in Somerset",
-  metaDescription:
-    "Need Laptop Repair Chard? We provide friendly laptop and computer repairs in Chard, Somerset with clear quotes and a warranty.",
-  websiteUrl: "https://example.com/laptop-repair-chard",
-  pageContent: `<h1>Laptop Repair Chard</h1>
-<h2>Fast laptop repairs in Chard, Somerset</h2>
-<p>We help homes and small businesses with Laptop Repair Chard services, including slow laptops, broken screens, charging faults, virus removal, data recovery, and Windows setup.</p>
-<p>Our local repair service covers Chard, Somerset and nearby villages. Call us today for a clear quote or book a repair visit. We offer honest advice, friendly support, and a warranty on completed repair work.</p>
-<h2>Why choose us?</h2>
-<p>Customers choose us because we have strong reviews, over 10 years experience, and a no fix no fee approach on selected repairs.</p>
-<h3>Get help today</h3>
-<p>Contact our Chard laptop repair team on 01460 123456 to get help with your computer problem.</p>`,
+  keyword: "dentist london",
+  location: "london",
+  title: "",
+  metaDescription: "",
+  websiteUrl: "https://www.londonsmileclinic.co.uk/",
+  pageContent: "",
   headings: {
-    h1: ["Laptop Repair Chard"],
-    h2: ["Fast laptop repairs in Chard, Somerset", "Why choose us?"],
-    h3: ["Get help today"]
+    h1: [],
+    h2: [],
+    h3: []
   },
-  schemaJson: `{
-  "@context": "https://schema.org",
-  "@type": "LocalBusiness",
-  "name": "Example Laptop Repair Chard",
-  "url": "https://example.com/laptop-repair-chard",
-  "telephone": "01460 123456",
-  "areaServed": "Chard, Somerset"
-}`,
+  schemaJson: "",
   reportData: {
     faqQuestions: [],
     faqItems: [],
@@ -178,6 +164,28 @@ const topicKeywords = [
   "business support",
   "remote support",
   "diagnostics"
+];
+
+const executionModes: Array<{
+  description: string;
+  label: string;
+  value: ExecutionMode;
+}> = [
+  {
+    description: "Smallest useful task set for quick implementation.",
+    label: "Fast",
+    value: "fast"
+  },
+  {
+    description: "Standard task list with practical validation.",
+    label: "Balanced",
+    value: "balanced"
+  },
+  {
+    description: "Full task list with deeper evidence checks.",
+    label: "Thorough",
+    value: "thorough"
+  }
 ];
 
 function ResultList({ items }: { items: string[] }) {
@@ -1090,6 +1098,8 @@ export default function Home() {
   const [caseStudy, setCaseStudy] = useState<CaseStudyState>(
     initialCaseStudyState
   );
+  const [executionMode, setExecutionMode] =
+    useState<ExecutionMode>("balanced");
   const [isFetching, setIsFetching] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isBenchmarking, setIsBenchmarking] = useState(false);
@@ -1401,7 +1411,8 @@ export default function Home() {
       },
       result,
       benchmark: completedBenchmarkResults,
-      benchmarkInsights
+      benchmarkInsights,
+      executionMode
     });
 
     downloadTextFile(taskPack, createAiTaskPackFileName(form.websiteUrl));
@@ -1890,6 +1901,34 @@ export default function Home() {
                   ? "Exporting PDF..."
                   : "Export Branded PDF Report"}
               </button>
+              <fieldset
+                aria-label="AI Task Pack execution mode"
+                className="execution-mode-toggle"
+              >
+                <legend>Execution mode</legend>
+                <div className="execution-mode-options">
+                  {executionModes.map((mode) => (
+                    <label
+                      className={
+                        executionMode === mode.value
+                          ? "execution-mode-option selected"
+                          : "execution-mode-option"
+                      }
+                      key={mode.value}
+                      title={mode.description}
+                    >
+                      <input
+                        checked={executionMode === mode.value}
+                        name="execution-mode"
+                        onChange={() => setExecutionMode(mode.value)}
+                        type="radio"
+                        value={mode.value}
+                      />
+                      <span>{mode.label}</span>
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
               <button
                 className="primary-button export-primary"
                 onClick={exportAiTaskPack}
