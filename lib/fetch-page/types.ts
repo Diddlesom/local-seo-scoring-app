@@ -23,4 +23,7 @@ export type FetchedPageData = {
     text: string;
     url: string;
   }>;
+  fetchStatus?: "success" | "limited";
+  fetchReason?: string;
+  fetchSource?: "direct" | "jina";
 };

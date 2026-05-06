@@ -34,6 +34,9 @@ type FetchedPageData = {
     text: string;
     url: string;
   }>;
+  fetchStatus?: "success" | "limited";
+  fetchReason?: string;
+  fetchSource?: "direct" | "jina";
 };
 
 type ReportDetectedData = {
@@ -77,6 +80,13 @@ type BenchmarkResult = BenchmarkCompetitor & {
   error?: string;
 };
 
+type CompetitorInput = {
+  raw: string;
+  snippet: string;
+  title: string;
+  url: string;
+};
+
 type CaseStudyState = {
   location: string;
   deviceType: string;
@@ -114,6 +124,13 @@ const initialCaseStudyState: CaseStudyState = {
   turnaroundTime: "",
   permissionConfirmed: "no"
 };
+
+const blockedCompetitorDomains = [
+  "reddit.com",
+  "quora.com",
+  "facebook.com",
+  "youtube.com"
+];
 
 const exampleFormState: FormState = {
   keyword: "dentist london",
@@ -322,6 +339,92 @@ function getCompetitorName(competitor: BenchmarkCompetitor): string {
   } catch {
     return competitor.url;
   }
+}
+
+function getHostname(value: string): string {
+  try {
+    return new URL(value).hostname.replace(/^www\./, "");
+  } catch {
+    return "";
+  }
+}
+
+function isBlockedCompetitorDomain(value: string): boolean {
+  const hostname = getHostname(value);
+
+  return blockedCompetitorDomains.some(
+    (domain) => hostname === domain || hostname.endsWith(`.${domain}`)
+  );
+}
+
+function parseCompetitorInput(rawInput: string): CompetitorInput | null {
+  const raw = rawInput.trim();
+  const urlMatch = raw.match(/https?:\/\/[^\s,]+/i);
+
+  if (!urlMatch) {
+    return null;
+  }
+
+  const url = urlMatch[0].replace(/[).,;]+$/g, "");
+  const context = raw.replace(urlMatch[0], " ").replace(/\s+/g, " ").trim();
+  const [title = "", ...snippetParts] = context
+    .split(/\s+[|—-]\s+/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+
+  return {
+    raw,
+    snippet: snippetParts.join(" "),
+    title,
+    url
+  };
+}
+
+function getErrorReason(errorMessage: string): string {
+  const httpMatch = errorMessage.match(/HTTP\s+\d+/i);
+
+  if (httpMatch) {
+    return httpMatch[0].toUpperCase();
+  }
+
+  if (/blocked/i.test(errorMessage)) {
+    return "blocked request";
+  }
+
+  if (/empty|visible page content|little readable/i.test(errorMessage)) {
+    return "empty content";
+  }
+
+  return errorMessage || "fetch restrictions";
+}
+
+function createLimitedBenchmarkResult({
+  input,
+  reason,
+  snippetOnly = false,
+  status = "inaccessible"
+}: {
+  input: CompetitorInput;
+  reason: string;
+  snippetOnly?: boolean;
+  status?: "inaccessible" | "limited";
+}): BenchmarkResult {
+  const snippetText = [input.title, input.snippet].filter(Boolean).join(" ");
+  const snippetTopics = snippetOnly ? detectTopicsServices(snippetText) : [];
+
+  return {
+    url: input.url,
+    title: input.title || getHostname(input.url) || input.url,
+    wordCount: 0,
+    headingsCount: 0,
+    schemaTypes: [],
+    trustSignals: [],
+    topicsServices: snippetTopics,
+    gapsFound: [],
+    fetchReason: `Competitor page could not be fully analysed due to fetch restrictions. Reason: ${reason}.`,
+    fetchStatus: status,
+    insightSource: snippetOnly ? "snippet-only" : "none"
+  };
 }
 
 function formatCompetitorCount(count: number, total: number): string {
@@ -1253,13 +1356,22 @@ export default function Home() {
     }
   }
 
-  async function analyseCompetitorUrl(url: string): Promise<BenchmarkResult> {
+  async function analyseCompetitorUrl(
+    input: CompetitorInput
+  ): Promise<BenchmarkResult> {
+    if (isBlockedCompetitorDomain(input.url)) {
+      return createLimitedBenchmarkResult({
+        input,
+        reason: "blocked domain"
+      });
+    }
+
     const fetchResponse = await fetch("/api/fetch-page", {
       method: "POST",
       headers: {
         "Content-Type": "application/json"
       },
-      body: JSON.stringify({ url })
+      body: JSON.stringify({ url: input.url })
     });
     const fetchedData = (await fetchResponse.json()) as unknown;
 
@@ -1272,11 +1384,26 @@ export default function Home() {
           ? fetchedData.error
           : "Competitor page could not be fetched.";
 
-      throw new Error(errorMessage);
+      return createLimitedBenchmarkResult({
+        input,
+        reason: getErrorReason(errorMessage),
+        snippetOnly: Boolean(input.title || input.snippet),
+        status: "inaccessible"
+      });
     }
 
     const pageData = fetchedData as FetchedPageData;
     const pageText = pageData.cleanText || pageData.bodyText || pageData.html;
+
+    if (!pageText || pageText.trim().length < 120) {
+      return createLimitedBenchmarkResult({
+        input,
+        reason: "empty content",
+        snippetOnly: Boolean(input.title || input.snippet),
+        status: "limited"
+      });
+    }
+
     const scoreResponse = await fetch("/api/score", {
       method: "POST",
       headers: {
@@ -1287,7 +1414,7 @@ export default function Home() {
         location: form.location,
         title: pageData.title,
         metaDescription: pageData.metaDescription,
-        websiteUrl: url,
+        websiteUrl: input.url,
         html: pageText,
         text: pageText,
         headings: pageData.headings,
@@ -1302,8 +1429,8 @@ export default function Home() {
     const competitorScore = (await scoreResponse.json()) as ScoreResult;
 
     return {
-      url,
-      title: pageData.title,
+      url: input.url,
+      title: pageData.title || input.title,
       wordCount: competitorScore.signals.wordCount,
       headingsCount: getHeadingsCount(competitorScore),
       schemaTypes: competitorScore.signals.schemaTypes,
@@ -1316,7 +1443,10 @@ export default function Home() {
             targetResult: result,
             targetText: form.pageContent
           })
-        : []
+        : [],
+      fetchReason: pageData.fetchReason,
+      fetchStatus: pageData.fetchStatus === "limited" ? "limited" : "analysed",
+      insightSource: "full"
     };
   }
 
@@ -1329,9 +1459,11 @@ export default function Home() {
       return;
     }
 
-    const urls = competitorUrls.map((url) => url.trim()).filter(Boolean);
+    const inputs = competitorUrls
+      .map(parseCompetitorInput)
+      .filter((input): input is CompetitorInput => Boolean(input));
 
-    if (urls.length === 0) {
+    if (inputs.length === 0) {
       setError("Please add at least one competitor URL.");
       return;
     }
@@ -1340,24 +1472,18 @@ export default function Home() {
 
     try {
       const results = await Promise.all(
-        urls.map(async (url) => {
+        inputs.map(async (input) => {
           try {
-            return await analyseCompetitorUrl(url);
+            return await analyseCompetitorUrl(input);
           } catch (benchmarkError) {
-            return {
-              url,
-              title: "",
-              wordCount: 0,
-              headingsCount: 0,
-              schemaTypes: [],
-              trustSignals: [],
-              topicsServices: [],
-              gapsFound: [],
-              error:
+            return createLimitedBenchmarkResult({
+              input,
+              reason:
                 benchmarkError instanceof Error
-                  ? benchmarkError.message
-                  : "Competitor could not be analysed."
-            };
+                  ? getErrorReason(benchmarkError.message)
+                  : "fetch restrictions",
+              snippetOnly: Boolean(input.title || input.snippet)
+            });
           }
         })
       );
@@ -1386,7 +1512,7 @@ export default function Home() {
         relatedInternalLinks: form.reportData.relatedInternalLinks
       },
       result,
-      benchmark: completedBenchmarkResults,
+      benchmark: benchmarkResults,
       benchmarkInsights
     });
 
@@ -1410,7 +1536,7 @@ export default function Home() {
         relatedInternalLinks: form.reportData.relatedInternalLinks
       },
       result,
-      benchmark: completedBenchmarkResults,
+      benchmark: benchmarkResults,
       benchmarkInsights,
       executionMode
     });
@@ -1445,10 +1571,11 @@ export default function Home() {
   }
 
   const completedBenchmarkResults = benchmarkResults.filter(
-    (benchmark): benchmark is BenchmarkCompetitor => !benchmark.error
+    (benchmark): benchmark is BenchmarkCompetitor =>
+      benchmark.insightSource === "full"
   );
   const benchmarkInsights =
-    result && completedBenchmarkResults.length > 0
+    result && completedBenchmarkResults.length >= 2
       ? buildBenchmarkInsights({
           competitors: completedBenchmarkResults,
           targetResult: result,
@@ -1663,9 +1790,12 @@ export default function Home() {
                   updateCompetitorUrl(index, event.target.value)
                 }
                 placeholder="https://competitor-site.com/service-page"
-                type="url"
+                type="text"
                 value={url}
               />
+              <span className="helper-text">
+                Optional: paste title or snippet text alongside the URL.
+              </span>
             </label>
           ))}
         </div>
@@ -1679,6 +1809,13 @@ export default function Home() {
           <p className="success">{benchmarkMessage}</p>
         ) : null}
 
+        {benchmarkResults.length > 0 && completedBenchmarkResults.length < 2 ? (
+          <p className="warning-output">
+            Competitor benchmark is limited because fewer than two competitor
+            pages could be fetched.
+          </p>
+        ) : null}
+
         {benchmarkInsights ? (
           <BenchmarkInsightsPanel insights={benchmarkInsights} />
         ) : null}
@@ -1690,10 +1827,52 @@ export default function Home() {
                 <span className="eyebrow">Competitor {index + 1}</span>
                 <h3>{benchmark.title || benchmark.url}</h3>
                 <p className="benchmark-url">{benchmark.url}</p>
-                {benchmark.error ? (
-                  <p className="error">{benchmark.error}</p>
+                {benchmark.insightSource !== "full" ? (
+                  <dl>
+                    <div>
+                      <dt>Status</dt>
+                      <dd>
+                        {benchmark.fetchStatus === "limited"
+                          ? "Limited fetch"
+                          : "Inaccessible"}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>Reason</dt>
+                      <dd>
+                        {benchmark.fetchReason ||
+                          "Competitor page could not be fully analysed due to fetch restrictions."}
+                      </dd>
+                    </div>
+                    {benchmark.insightSource === "snippet-only" ? (
+                      <div>
+                        <dt>Snippet-only insight</dt>
+                        <dd>
+                          <InlineList
+                            emptyText="No lightweight themes detected from title/snippet"
+                            items={benchmark.topicsServices}
+                          />
+                        </dd>
+                      </div>
+                    ) : null}
+                  </dl>
                 ) : (
                   <dl>
+                    {benchmark.fetchStatus === "limited" ? (
+                      <>
+                        <div>
+                          <dt>Status</dt>
+                          <dd>Limited fetch</dd>
+                        </div>
+                        <div>
+                          <dt>Reason</dt>
+                          <dd>
+                            {benchmark.fetchReason ||
+                              "Fetched using fallback content."}
+                          </dd>
+                        </div>
+                      </>
+                    ) : null}
                     <div>
                       <dt>Word count</dt>
                       <dd>{benchmark.wordCount}</dd>

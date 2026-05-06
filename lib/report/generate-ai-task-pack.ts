@@ -665,12 +665,56 @@ function formatBenchmarkContext(benchmark?: BenchmarkCompetitor[]): string {
     return "No competitor benchmark has been added yet.";
   }
 
-  return benchmark
-    .map((competitor, index) =>
-      [
+  const analysedCount = benchmark.filter(
+    (competitor) => competitor.insightSource === "full"
+  ).length;
+  const limitedNotice =
+    analysedCount < 2
+      ? [
+          "Competitor benchmark is limited because fewer than two competitor pages could be fetched.",
+          ""
+        ]
+      : [];
+
+  return [
+    ...limitedNotice,
+    benchmark
+      .map((competitor, index) => {
+        if (competitor.insightSource !== "full") {
+          return [
+            `Competitor ${index + 1}`,
+            `- URL: ${competitor.url}`,
+            `- Title: ${competitor.title ? cleanText(competitor.title) : "Not found"}`,
+            `- Status: ${
+              competitor.fetchStatus === "limited"
+                ? "Limited fetch"
+                : "Inaccessible"
+            }`,
+            `- Reason: ${
+              competitor.fetchReason
+                ? cleanText(competitor.fetchReason)
+                : "Competitor page could not be fully analysed due to fetch restrictions."
+            }`,
+            competitor.insightSource === "snippet-only"
+              ? `- Snippet-only insight: ${
+                  competitor.topicsServices.length
+                    ? competitor.topicsServices.map(cleanText).join(", ")
+                    : "No lightweight themes detected from title/snippet"
+                }`
+              : ""
+          ]
+            .filter(Boolean)
+            .join("\n");
+        }
+
+        return [
         `Competitor ${index + 1}`,
         `- URL: ${competitor.url}`,
         `- Title: ${competitor.title ? cleanText(competitor.title) : "Not found"}`,
+        competitor.fetchStatus === "limited" ? "- Status: Limited fetch" : "",
+        competitor.fetchReason
+          ? `- Reason: ${cleanText(competitor.fetchReason)}`
+          : "",
         `- Word count: ${competitor.wordCount}`,
         `- Headings count: ${competitor.headingsCount}`,
         `- Schema types: ${
@@ -695,9 +739,12 @@ function formatBenchmarkContext(benchmark?: BenchmarkCompetitor[]): string {
               .map((gap) => `- ${cleanText(gap)}`)
               .join("\n")
           : "- No consistent patterns detected across competitors yet"
-      ].join("\n")
-    )
-    .join("\n\n");
+      ]
+        .filter(Boolean)
+        .join("\n");
+      })
+      .join("\n\n")
+  ].join("\n");
 }
 
 function formatBenchmarkInsightsContext(
