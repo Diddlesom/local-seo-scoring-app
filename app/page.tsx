@@ -317,12 +317,13 @@ function detectTopicsServices(
 function getBenchmarkGaps({
   competitor,
   competitorText,
+  intentMode = "local-seo",
   targetResult,
   targetText
 }: {
   competitor: ScoreResult;
   competitorText: string;
-  intentMode: IntentMode;
+  intentMode?: IntentMode;
   targetResult: ScoreResult;
   targetText: string;
 }): string[] {
