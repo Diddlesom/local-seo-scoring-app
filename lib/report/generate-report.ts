@@ -791,11 +791,7 @@ function getAssistantInstructions(mode?: IntentMode): string[] {
     "- Do not invent case studies, reviews, locations, services, or claims.",
     '- If information is missing, write: "Business owner must confirm."',
     "- Return copy-paste-ready code or content where possible.",
-    "- Keep recommendations practical for WordPress.",
-    "",
-    "CASE STUDY RULE",
-    "- Only include a case study if the business owner confirms it happened.",
-    "- Do not invent customer examples, locations, devices, problems, fixes, or turnaround times."
+    "- Keep recommendations practical for WordPress."
   ];
 
   if (mode === "saas") {
@@ -804,6 +800,13 @@ function getAssistantInstructions(mode?: IntentMode): string[] {
       "CASE STUDY / TESTIMONIAL RULE",
       "- Only include testimonials, case studies, customer names, metrics, or outcomes if the business owner confirms they are real.",
       "- Do not invent customers, results, screenshots, integrations, compliance claims, or security certifications."
+    );
+  } else {
+    instructions.push(
+      "",
+      "CASE STUDY RULE",
+      "- Only include a case study if the business owner confirms it happened.",
+      "- Do not invent customer examples, locations, devices, problems, fixes, or turnaround times."
     );
   }
 
@@ -821,7 +824,7 @@ function listItems(
   return items.map((item) => `- ${cleanReportText(item)}`).join("\n");
 }
 
-function simplifyBenchmarkGap(gap: string): string {
+function simplifyBenchmarkGap(gap: string, mode?: IntentMode): string {
   const cleanGap = gap.toLowerCase();
 
   if (cleanGap.includes("deeper page content")) {
@@ -833,6 +836,10 @@ function simplifyBenchmarkGap(gap: string): string {
   }
 
   if (cleanGap.includes("more headings")) {
+    if (mode === "saas") {
+      return "Fewer product/use-case subheadings than competitors";
+    }
+
     return "Fewer service subheadings than competitors";
   }
 
@@ -853,6 +860,13 @@ function simplifyBenchmarkGap(gap: string): string {
   if (cleanGap.includes("buyer-intent coverage for")) {
     const topicMatch = gap.match(/for (.*?) because/i);
     const topic = topicMatch?.[1] ?? "buyer intent";
+
+    return `Missing ${topic} coverage`;
+  }
+
+  if (cleanGap.includes("product/use-case coverage for")) {
+    const topicMatch = gap.match(/for (.*?) because/i);
+    const topic = topicMatch?.[1] ?? "product/use-case";
 
     return `Missing ${topic} coverage`;
   }
@@ -954,7 +968,7 @@ function formatBenchmark(
         }`,
         "Target page gaps found:",
         listItems(
-          competitor.gapsFound.map(simplifyBenchmarkGap),
+          competitor.gapsFound.map((gap) => simplifyBenchmarkGap(gap, mode)),
           "- No consistent patterns detected across competitors yet"
         )
       ]
@@ -1199,15 +1213,25 @@ function getTaskDetails(
   }
 
   if (page.intentMode === "saas" && cleanAction.includes("page title")) {
+    const isComparisonTask = /\b(?:comparison|compare|review|alternative|alternatives)\b/i.test(
+      `${cleanAction} ${page.keyword} ${page.title}`
+    );
+
     return {
       whereToImplement:
         "SEO title field, page title, or product page title setting.",
       whatToChange:
-        "Rewrite the title so the SaaS product topic, product category, or use case is clear.",
+        isComparisonTask
+          ? "Rewrite the title so the SaaS comparison angle and target use case are clear."
+          : "Rewrite the title so the SaaS product topic, product category, or use case is clear.",
       example:
-        `Example title: ${targetKeyword} Software for Growing Teams`,
+        isComparisonTask
+          ? `Example title: Best ${targetKeyword.replace(/^best\s+/i, "")} Compared for Growing Teams`
+          : `Example title: ${targetKeyword} Software for Growing Teams`,
       expectedOutcome:
-        "Readers and search engines can quickly understand the SaaS product and use-case promise."
+        isComparisonTask
+          ? "Readers and search engines can quickly understand the SaaS comparison promise."
+          : "Readers and search engines can quickly understand the SaaS product and use-case promise."
     };
   }
 
@@ -1233,6 +1257,8 @@ function getTaskDetails(
   if (
     page.intentMode === "saas" &&
     (cleanAction.includes("softwareapplication") ||
+      cleanAction.includes("article") ||
+      cleanAction.includes("itemlist") ||
       cleanAction.includes("organization") ||
       cleanAction.includes("breadcrumblist") ||
       cleanAction.includes("product schema") ||
@@ -1242,9 +1268,13 @@ function getTaskDetails(
       whereToImplement:
         "SEO plugin custom schema field, page head, or page-level JSON-LD injection area.",
       whatToChange:
-        "Add SoftwareApplication, Product, Organization, BreadcrumbList, or FAQPage schema where appropriate. Only add FAQPage schema if visible FAQs are added first.",
+        cleanAction.includes("article") || cleanAction.includes("itemlist")
+          ? "Add Article, ItemList, Product, or FAQPage schema where appropriate. Only add FAQPage schema if visible FAQs are added first."
+          : "Add SoftwareApplication, Product, Organization, BreadcrumbList, or FAQPage schema where appropriate. Only add FAQPage schema if visible FAQs are added first.",
       example:
-        "Use SoftwareApplication schema for the SaaS product, Product schema where product fields are visible, Organization schema for the company, BreadcrumbList for navigation, and FAQPage only for visible FAQ questions and answers.",
+        cleanAction.includes("article") || cleanAction.includes("itemlist")
+          ? "Use Article schema for the comparison article, ItemList schema for ranked lists, Product schema where product fields are visible, and FAQPage only for visible FAQ questions and answers."
+          : "Use SoftwareApplication schema for the SaaS product, Product schema where product fields are visible, Organization schema for the company, BreadcrumbList for navigation, and FAQPage only for visible FAQ questions and answers.",
       expectedOutcome:
         "Structured data supports SaaS product content without using LocalBusiness or location schema."
     };
@@ -1332,6 +1362,7 @@ function getTaskDetails(
   if (
     page.intentMode === "saas" &&
     (cleanAction.includes("product positioning") ||
+      cleanAction.includes("comparison angle") ||
       cleanAction.includes("feature") ||
       cleanAction.includes("use-case") ||
       cleanAction.includes("use case") ||
@@ -1344,15 +1375,25 @@ function getTaskDetails(
       cleanAction.includes("trial") ||
       cleanAction.includes("signup"))
   ) {
+    const isComparisonTask = /\b(?:comparison|compared|compare|best-fit|best fit|each tool|each saas|pros and cons)\b/i.test(cleanAction);
+
     return {
       whereToImplement:
-        "Inside the main SaaS product content, near the relevant product, feature, use-case, pricing, integration, or CTA section.",
+        isComparisonTask
+          ? "Inside the main SaaS comparison/review content, near the tool recommendations or comparison section."
+          : "Inside the main SaaS product content, near the relevant product, feature, use-case, pricing, integration, or CTA section.",
       whatToChange:
-        "Add clear product sections that explain what the SaaS product does, who it helps, why it matters, and what the next step is.",
+        isComparisonTask
+          ? "Clarify the comparison angle, comparison criteria, and who each tool is best for."
+          : "Add clear product sections that explain what the SaaS product does, who it helps, why it matters, and what the next step is.",
       example:
-        "Example product section labels: Key features, Use cases, Integrations, Pricing and trial, Product screenshots, Compare alternatives.",
+        isComparisonTask
+          ? "Example comparison section labels: Comparison table, Best for, Key features compared, Pricing/free trial comparison, Integrations compared, Setup/onboarding notes, Pros and cons, FAQs."
+          : "Example product section labels: Key features, Use cases, Integrations, Pricing and trial, Product screenshots, Compare alternatives.",
       expectedOutcome:
-        "The page gives clearer product-led SEO coverage without adding local SEO or affiliate roundup wording."
+        isComparisonTask
+          ? "The page gives clearer SaaS comparison guidance without drifting into affiliate disclosure or Amazon-style review wording."
+          : "The page gives clearer product-led SEO coverage without adding local SEO or affiliate roundup wording."
     };
   }
 

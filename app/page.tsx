@@ -585,6 +585,8 @@ function getBenchmarkGaps({
     gaps.add(
       intentMode === "affiliate"
         ? "Add more useful buyer detail because this competitor has deeper page content than your target page."
+        : intentMode === "saas"
+          ? "Add more useful product/use-case detail because this competitor has deeper page content than your target page."
         : "Add more useful service detail because this competitor has deeper page content than your target page."
     );
   }
@@ -593,6 +595,8 @@ function getBenchmarkGaps({
     gaps.add(
       intentMode === "affiliate"
         ? "Expand the page structure with clearer buyer sections because this competitor uses more headings."
+        : intentMode === "saas"
+          ? "Expand the page structure with clearer product/use-case subheadings because this competitor uses more headings."
         : "Expand the page structure with clearer service subheadings because this competitor uses more headings."
     );
   }
@@ -618,6 +622,8 @@ function getBenchmarkGaps({
       gaps.add(
         intentMode === "affiliate"
           ? `Add buyer-intent coverage for ${topic} because competitors cover it and your target page does not.`
+          : intentMode === "saas"
+            ? `Add product/use-case coverage for ${topic} because competitors cover it and your target page does not.`
           : `Add a clear mention or short section for ${topic} because competitors cover it and your target page does not.`
       );
     }
@@ -756,7 +762,7 @@ function formatCompetitorCount(count: number, total: number): string {
   return `${count} of ${total} competitors`;
 }
 
-function simplifyBenchmarkGap(gap: string): string {
+function simplifyBenchmarkGap(gap: string, intentMode?: IntentMode): string {
   const cleanGap = gap.toLowerCase();
 
   if (cleanGap.includes("deeper page content")) {
@@ -768,6 +774,10 @@ function simplifyBenchmarkGap(gap: string): string {
   }
 
   if (cleanGap.includes("more headings")) {
+    if (intentMode === "saas") {
+      return "Fewer product/use-case subheadings than competitors";
+    }
+
     return "Fewer service subheadings than competitors";
   }
 
@@ -788,6 +798,13 @@ function simplifyBenchmarkGap(gap: string): string {
   if (cleanGap.includes("buyer-intent coverage for")) {
     const topicMatch = gap.match(/for (.*?) because/i);
     const topic = topicMatch?.[1] ?? "buyer intent";
+
+    return `Missing ${topic} coverage`;
+  }
+
+  if (cleanGap.includes("product/use-case coverage for")) {
+    const topicMatch = gap.match(/for (.*?) because/i);
+    const topic = topicMatch?.[1] ?? "product/use-case";
 
     return `Missing ${topic} coverage`;
   }
@@ -963,7 +980,7 @@ function buildBenchmarkInsights({
   const keyGaps = uniqueItems(
     competitors
       .flatMap((competitor) => competitor.gapsFound)
-      .map(simplifyBenchmarkGap)
+      .map((gap) => simplifyBenchmarkGap(gap, intentMode))
       .filter(
         (gap) =>
           targetResult.signals.wordCount < averageWordCount ||

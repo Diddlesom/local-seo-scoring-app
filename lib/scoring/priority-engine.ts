@@ -102,10 +102,14 @@ export function createPriorityActions(
   }
 
   if (intentMode === "saas") {
+    const isComparisonPage = isSaasComparisonPage(input);
+
     if (!signals.titleKeywordMatch) {
       actions.push({
         id: "add-product-topic-to-title",
-        title: "Make the SaaS product topic clear in the page title",
+        title: isComparisonPage
+          ? "Clarify the SaaS comparison angle in the page title"
+          : "Make the SaaS product topic clear in the page title",
         priority: "high"
       });
     }
@@ -113,7 +117,9 @@ export function createPriorityActions(
     if (!signals.metaDescriptionKeywordMatch) {
       actions.push({
         id: "add-product-topic-to-meta-description",
-        title: "Make the SaaS product topic clear in the meta description",
+        title: isComparisonPage
+          ? "Clarify the SaaS comparison angle in the meta description"
+          : "Make the SaaS product topic clear in the meta description",
         priority: "medium"
       });
     }
@@ -573,6 +579,14 @@ function hasRelevantSaasInternalLinks(
   return relevantLinks.length >= 1;
 }
 
+function isSaasComparisonPage(input: ScoringInput): boolean {
+  const comparable = `${input.keyword ?? ""}\n${input.title ?? ""}\n${input.metaDescription ?? ""}\n${input.text ?? ""}\n${input.html ?? ""}`;
+
+  return /\b(?:best|top|review|reviews|comparison|compare|versus| vs\.? |alternative|alternatives|competitor|competitors)\b/i.test(
+    comparable
+  );
+}
+
 function createBlogMediaPrioritizedActions(
   input: ScoringInput,
   signals: ExtractedSignals
@@ -921,6 +935,7 @@ function createSaasPrioritizedActions(
     ...extractInternalLinksFromHtml(input.websiteUrl, input.html)
   ];
   const schemaTypes = new Set(signals.schemaTypes);
+  const isComparisonPage = isSaasComparisonPage(input);
   const hasProductPositioning = signals.topicSignals.includes("Product name/entities");
   const hasFeatures = signals.topicSignals.includes("Features");
   const hasBenefits = signals.topicSignals.includes("Benefits");
@@ -946,15 +961,28 @@ function createSaasPrioritizedActions(
     /\b(?:features|pricing|integrations|docs|help center|help centre|use cases|alternatives)\b/i.test(
       pageText
     );
-  const hasSaasSchema = [
-    "SoftwareApplication",
-    "Product",
-    "Organization",
-    "BreadcrumbList",
-    "FAQPage"
-  ].some((type) => schemaTypes.has(type));
+  const supportedSchemaTypes = isComparisonPage
+    ? ["Article", "ItemList", "Product", "FAQPage"]
+    : [
+        "SoftwareApplication",
+        "Product",
+        "Organization",
+        "BreadcrumbList",
+        "FAQPage"
+      ];
+  const hasSaasSchema = supportedSchemaTypes.some((type) => schemaTypes.has(type));
 
-  if (!signals.titleKeywordMatch || !hasProductPositioning) {
+  if (isComparisonPage && (!signals.titleKeywordMatch || !hasComparison)) {
+    actions.push(
+      createAction({
+        impact: 8,
+        ease: 8,
+        action: "Clarify the comparison angle and who each tool is best for.",
+        whyItMatters:
+          "SaaS comparison and review pages need to explain which tools are being compared, the criteria used, and which use cases each option fits."
+      })
+    );
+  } else if (!signals.titleKeywordMatch || !hasProductPositioning) {
     actions.push(
       createAction({
         impact: 8,
@@ -966,14 +994,30 @@ function createSaasPrioritizedActions(
     );
   }
 
+  if (isComparisonPage && !hasComparison) {
+    actions.push(
+      createAction({
+        impact: 8,
+        ease: 6,
+        action: "Add comparison criteria and a feature comparison section.",
+        whyItMatters:
+          "Comparison criteria help readers understand why each SaaS tool is recommended and how the options differ."
+      })
+    );
+  }
+
   if (!hasFeatures) {
     actions.push(
       createAction({
         impact: 8,
         ease: 7,
-        action: "Add clear product feature sections.",
+        action: isComparisonPage
+          ? "Add key features compared across the SaaS tools."
+          : "Add clear product feature sections.",
         whyItMatters:
-          "Feature sections help prospects understand what the product actually does."
+          isComparisonPage
+            ? "Feature comparison helps readers evaluate the tools on equal terms."
+            : "Feature sections help prospects understand what the product actually does."
       })
     );
   }
@@ -995,9 +1039,13 @@ function createSaasPrioritizedActions(
       createAction({
         impact: 7,
         ease: 6,
-        action: "Add use-case, industry, or persona sections.",
+        action: isComparisonPage
+          ? "Add best-fit or use-case labels for each SaaS tool."
+          : "Add use-case, industry, or persona sections.",
         whyItMatters:
-          "Use-case sections help the page match more SaaS search intent and show who the product is built for."
+          isComparisonPage
+            ? "Best-fit labels help readers decide which tool suits their team, budget, or workflow."
+            : "Use-case sections help the page match more SaaS search intent and show who the product is built for."
       })
     );
   }
@@ -1007,9 +1055,13 @@ function createSaasPrioritizedActions(
       createAction({
         impact: 8,
         ease: 8,
-        action: "Add pricing, free trial, demo, signup, or contact sales CTA wording.",
+        action: isComparisonPage
+          ? "Add pricing and free trial comparison detail."
+          : "Add pricing, free trial, demo, signup, or contact sales CTA wording.",
         whyItMatters:
-          "SaaS visitors need a clear next step when evaluating a product."
+          isComparisonPage
+            ? "Pricing and trial differences are key decision factors on SaaS comparison pages."
+            : "SaaS visitors need a clear next step when evaluating a product."
       })
     );
   }
@@ -1019,14 +1071,18 @@ function createSaasPrioritizedActions(
       createAction({
         impact: 6,
         ease: 6,
-        action: "Add an integrations section where accurate.",
+        action: isComparisonPage
+          ? "Add integrations compared across the SaaS tools."
+          : "Add an integrations section where accurate.",
         whyItMatters:
-          "Integrations help buyers understand how the product fits into their existing stack."
+          isComparisonPage
+            ? "Integration coverage helps readers understand which option fits their existing stack."
+            : "Integrations help buyers understand how the product fits into their existing stack."
       })
     );
   }
 
-  if (!hasComparison) {
+  if (!isComparisonPage && !hasComparison) {
     actions.push(
       createAction({
         impact: 5,
@@ -1043,9 +1099,13 @@ function createSaasPrioritizedActions(
       createAction({
         impact: 4,
         ease: 6,
-        action: "Add onboarding, setup, or implementation detail.",
+        action: isComparisonPage
+          ? "Add setup or onboarding notes for each SaaS option."
+          : "Add onboarding, setup, or implementation detail.",
         whyItMatters:
-          "Setup information reduces friction for prospects wondering how hard the product is to adopt."
+          isComparisonPage
+            ? "Setup notes help readers compare adoption effort between tools."
+            : "Setup information reduces friction for prospects wondering how hard the product is to adopt."
       })
     );
   }
@@ -1055,14 +1115,18 @@ function createSaasPrioritizedActions(
       createAction({
         impact: 6,
         ease: 5,
-        action: "Add screenshots or product visuals.",
+        action: isComparisonPage
+          ? "Add screenshots for each SaaS option where available."
+          : "Add screenshots or product visuals.",
         whyItMatters:
-          "Product visuals help prospects understand the interface before requesting a demo or trial."
+          isComparisonPage
+            ? "Screenshots make SaaS comparisons more concrete and easier to trust."
+            : "Product visuals help prospects understand the interface before requesting a demo or trial."
       })
     );
   }
 
-  if (!hasTestimonials) {
+  if (!isComparisonPage && !hasTestimonials) {
     actions.push(
       createAction({
         impact: 6,
@@ -1117,9 +1181,13 @@ function createSaasPrioritizedActions(
         impact: 6,
         ease: 5,
         action:
-          "Add SoftwareApplication, Product, Organization, BreadcrumbList, or FAQPage schema where appropriate.",
+          isComparisonPage
+            ? "Add Article, ItemList, Product, or FAQPage schema where appropriate."
+            : "Add SoftwareApplication, Product, Organization, BreadcrumbList, or FAQPage schema where appropriate.",
         whyItMatters:
-          "SaaS-friendly schema clarifies the product, organization, navigation, and visible FAQ content."
+          isComparisonPage
+            ? "Comparison-friendly schema clarifies the article, ranked list, products, and visible FAQ content."
+            : "SaaS-friendly schema clarifies the product, organization, navigation, and visible FAQ content."
       })
     );
   } else if (countSchemaTypes(schemaSource) > 1) {

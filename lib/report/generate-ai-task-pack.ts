@@ -729,7 +729,7 @@ function formatExistingEditorialInternalLinks(page: ReportPageDetails): string {
   ].join("\n");
 }
 
-function simplifyBenchmarkGap(gap: string): string {
+function simplifyBenchmarkGap(gap: string, mode?: IntentMode): string {
   const cleanGap = gap.toLowerCase();
 
   if (cleanGap.includes("deeper page content")) {
@@ -741,6 +741,10 @@ function simplifyBenchmarkGap(gap: string): string {
   }
 
   if (cleanGap.includes("more headings")) {
+    if (mode === "saas") {
+      return "Fewer product/use-case subheadings than competitors";
+    }
+
     return "Fewer service subheadings than competitors";
   }
 
@@ -761,6 +765,13 @@ function simplifyBenchmarkGap(gap: string): string {
   if (cleanGap.includes("buyer-intent coverage for")) {
     const topicMatch = gap.match(/for (.*?) because/i);
     const topic = topicMatch?.[1] ?? "buyer intent";
+
+    return `Missing ${topic} coverage`;
+  }
+
+  if (cleanGap.includes("product/use-case coverage for")) {
+    const topicMatch = gap.match(/for (.*?) because/i);
+    const topic = topicMatch?.[1] ?? "product/use-case";
 
     return `Missing ${topic} coverage`;
   }
@@ -859,10 +870,18 @@ function getCodeOrContent(action: PrioritizedAction, page: ReportPageDetails): s
   }
 
   if (page.intentMode === "saas" && cleanAction.includes("page title")) {
+    const isComparisonTask = /\b(?:comparison|compare|review|alternative|alternatives)\b/i.test(
+      `${cleanAction} ${page.keyword} ${page.title}`
+    );
+
     return [
-      "Use a product-led title that includes the target keyword and the SaaS product/use-case promise.",
+      isComparisonTask
+        ? "Use a comparison-led title that includes the target keyword and the SaaS comparison promise."
+        : "Use a product-led title that includes the target keyword and the SaaS product/use-case promise.",
       "",
-      `Example title: ${targetKeyword} Software for Growing Teams`
+      isComparisonTask
+        ? `Example title: Best ${targetKeyword.replace(/^best\s+/i, "")} Compared for Growing Teams`
+        : `Example title: ${targetKeyword} Software for Growing Teams`
     ].join("\n");
   }
 
@@ -885,17 +904,32 @@ function getCodeOrContent(action: PrioritizedAction, page: ReportPageDetails): s
   if (
     page.intentMode === "saas" &&
     (cleanAction.includes("softwareapplication") ||
+      cleanAction.includes("article") ||
+      cleanAction.includes("itemlist") ||
       cleanAction.includes("organization") ||
       cleanAction.includes("breadcrumblist") ||
       cleanAction.includes("product schema") ||
       cleanAction.includes("faqpage schema"))
   ) {
+    const isComparisonSchema =
+      cleanAction.includes("article") || cleanAction.includes("itemlist");
+
     return [
-      "Add SoftwareApplication, Product, Organization, BreadcrumbList, or FAQPage schema where appropriate. Only add FAQPage schema if visible FAQs are added first.",
-      "- SoftwareApplication: for the SaaS product.",
-      "- Product: where product fields are visible.",
-      "- Organization: for company-level details.",
-      "- BreadcrumbList: for navigation.",
+      isComparisonSchema
+        ? "Add Article, ItemList, Product, or FAQPage schema where appropriate. Only add FAQPage schema if visible FAQs are added first."
+        : "Add SoftwareApplication, Product, Organization, BreadcrumbList, or FAQPage schema where appropriate. Only add FAQPage schema if visible FAQs are added first.",
+      ...(isComparisonSchema
+        ? [
+            "- Article: for the comparison/review article.",
+            "- ItemList: for ranked or listed tools.",
+            "- Product: where product fields are visible."
+          ]
+        : [
+            "- SoftwareApplication: for the SaaS product.",
+            "- Product: where product fields are visible.",
+            "- Organization: for company-level details.",
+            "- BreadcrumbList: for navigation."
+          ]),
       "- FAQPage: only when visible FAQ questions and answers exist on the page."
     ].join("\n");
   }
@@ -911,6 +945,7 @@ function getCodeOrContent(action: PrioritizedAction, page: ReportPageDetails): s
   if (
     page.intentMode === "saas" &&
     (cleanAction.includes("product positioning") ||
+      cleanAction.includes("comparison angle") ||
       cleanAction.includes("feature") ||
       cleanAction.includes("use-case") ||
       cleanAction.includes("use case") ||
@@ -923,16 +958,34 @@ function getCodeOrContent(action: PrioritizedAction, page: ReportPageDetails): s
       cleanAction.includes("trial") ||
       cleanAction.includes("signup"))
   ) {
+    const isComparisonTask = /\b(?:comparison|compared|compare|best-fit|best fit|each tool|each saas|pros and cons)\b/i.test(cleanAction);
+
     return [
-      "Add SaaS product structure only where it matches visible product facts.",
+      isComparisonTask
+        ? "Add SaaS comparison structure only where it matches visible product facts."
+        : "Add SaaS product structure only where it matches visible product facts.",
       "",
-      "Suggested section labels:",
-      "- Key features",
-      "- Use cases",
-      "- Integrations",
-      "- Pricing and trial",
-      "- Product screenshots",
-      "- Compare alternatives"
+      isComparisonTask
+        ? [
+            "Suggested comparison section labels:",
+            "- Comparison table",
+            "- Best for",
+            "- Key features compared",
+            "- Pricing/free trial comparison",
+            "- Integrations compared",
+            "- Setup/onboarding notes",
+            "- Pros and cons",
+            "- FAQs"
+          ].join("\n")
+        : [
+            "Suggested section labels:",
+            "- Key features",
+            "- Use cases",
+            "- Integrations",
+            "- Pricing and trial",
+            "- Product screenshots",
+            "- Compare alternatives"
+          ].join("\n")
     ].join("\n");
   }
 
@@ -1279,7 +1332,7 @@ function formatBenchmarkContext(
         "Target page gaps found:",
         competitor.gapsFound.length
           ? competitor.gapsFound
-              .map(simplifyBenchmarkGap)
+              .map((gap) => simplifyBenchmarkGap(gap, mode))
               .map((gap) => `- ${cleanText(gap)}`)
               .join("\n")
           : "- No consistent patterns detected across competitors yet"
