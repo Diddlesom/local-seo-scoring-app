@@ -16,6 +16,10 @@ export type ScoringInput = {
   schemaJson?: string;
   text?: string;
   websiteUrl?: string;
+  relatedInternalLinks?: Array<{
+    text: string;
+    url: string;
+  }>;
 };
 
 export type ExtractedSignals = {

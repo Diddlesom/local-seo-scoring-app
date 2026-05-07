@@ -381,7 +381,28 @@ function extractRelatedInternalLinks(
     "virus",
     "repair",
     "service",
-    "location"
+    "location",
+    "guide",
+    "guides",
+    "article",
+    "articles",
+    "blog",
+    "help",
+    "faq",
+    "support",
+    "troubleshooting",
+    "checklist",
+    "explainer",
+    "startup",
+    "malware",
+    "overheating",
+    "slow startup",
+    "slow boot",
+    "browser",
+    "windows update",
+    "ram",
+    "hard drive",
+    "antivirus"
   ];
   const links = new Map<string, { score: number; text: string; url: string }>();
   let match = linkPattern.exec(html);
@@ -399,8 +420,7 @@ function extractRelatedInternalLinks(
       if (
         resolvedUrl.hostname === baseUrl.hostname &&
         normalizeUrlForComparison(resolvedUrl) !== currentPageUrl &&
-        score > 0 &&
-        !looksLikeBlogUrl(resolvedUrl)
+        score > 0
       ) {
         links.set(resolvedUrl.toString(), {
           score,
@@ -424,12 +444,6 @@ function extractRelatedInternalLinks(
 function normalizeUrlForComparison(url: URL): string {
   const pathname = url.pathname.replace(/\/+$/g, "") || "/";
   return `${url.origin}${pathname}`.toLowerCase();
-}
-
-function looksLikeBlogUrl(url: URL): boolean {
-  return /\/(blog|news|article|articles|post|posts|category|tag)\//i.test(
-    url.pathname
-  );
 }
 
 export function extractPageData(url: string, html: string): FetchedPageData {

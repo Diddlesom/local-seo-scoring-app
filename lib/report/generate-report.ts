@@ -206,6 +206,12 @@ type InternalLinkRecommendation = {
   url: string;
 };
 
+type InternalLinkRecommendationGroups = {
+  highConfidence: InternalLinkRecommendation[];
+  mediumConfidence: InternalLinkRecommendation[];
+  rejected: InternalLinkRecommendation[];
+};
+
 const serviceTopics = [
   "laptop repair",
   "mac repair",
@@ -315,11 +321,7 @@ function topicMatches(anchorTopics: string[], destinationTopics: string[]): bool
 
 function getInternalLinkRecommendations(
   page: ReportPageDetails
-): {
-  highConfidence: InternalLinkRecommendation[];
-  mediumConfidence: InternalLinkRecommendation[];
-  rejected: InternalLinkRecommendation[];
-} {
+): InternalLinkRecommendationGroups {
   const isBlogMedia = page.intentMode === "blog-media";
   const currentPageUrl = normalizeUrlForComparison(page.url);
   const recommendations = page.relatedInternalLinks
@@ -448,11 +450,41 @@ function getInternalLinkRecommendations(
   };
 }
 
+function hasRelevantEditorialInternalLinks(
+  recommendations: InternalLinkRecommendationGroups
+): boolean {
+  return (
+    recommendations.highConfidence.length + recommendations.mediumConfidence.length >=
+    1
+  );
+}
+
 function formatInternalLinkRecommendations(page: ReportPageDetails): string {
   const recommendations = getInternalLinkRecommendations(page);
   const isBlogMedia = page.intentMode === "blog-media";
   const formatLink = (link: InternalLinkRecommendation) =>
     `- ${cleanReportText(link.text)} → ${link.url}\n  Reason: ${link.reason}`;
+
+  if (isBlogMedia && hasRelevantEditorialInternalLinks(recommendations)) {
+    return [
+      "Relevant editorial internal links already present.",
+      "",
+      "Detected relevant internal links",
+      ...recommendations.highConfidence.map(formatLink),
+      ...recommendations.mediumConfidence.map(formatLink),
+      "",
+      "Rejected or risky links",
+      recommendations.rejected.length > 0
+        ? recommendations.rejected
+            .map(
+              (link) =>
+                `- Do not use ${cleanReportText(link.text)} → ${link.url}\n  Reason: ${link.rejectedReason}`
+            )
+            .join("\n")
+        : "- No rejected links to flag"
+    ].join("\n");
+  }
+
   const highConfidence =
     recommendations.highConfidence.length > 0
       ? recommendations.highConfidence.map(formatLink).join("\n")
@@ -514,6 +546,30 @@ function formatInternalLinkRecommendations(page: ReportPageDetails): string {
     "",
     "Rejected or risky links",
     rejected
+  ].join("\n");
+}
+
+function formatExistingEditorialInternalLinks(page: ReportPageDetails): string {
+  if (page.intentMode !== "blog-media") {
+    return "";
+  }
+
+  const recommendations = getInternalLinkRecommendations(page);
+
+  if (!hasRelevantEditorialInternalLinks(recommendations)) {
+    return "";
+  }
+
+  const formatLink = (link: InternalLinkRecommendation) =>
+    `- ${cleanReportText(link.text)} → ${link.url}\n  Reason: ${link.reason}`;
+
+  return [
+    "INTERNAL LINK STATUS",
+    "Relevant editorial internal links already present.",
+    "",
+    "Detected relevant internal links",
+    ...recommendations.highConfidence.map(formatLink),
+    ...recommendations.mediumConfidence.map(formatLink)
   ].join("\n");
 }
 
@@ -757,7 +813,9 @@ function formatBenchmarkInsights(insights?: BenchmarkInsights | null): string {
     "Content depth comparison:",
     `- ${cleanReportText(insights.contentDepthComparison)}`,
     "",
-    "Topic/service overlap:",
+    insights.intentMode === "blog-media"
+      ? "Topic/entity overlap:"
+      : "Topic/service overlap:",
     listItems(insights.topicServiceOverlap),
     "",
     "Trust signal presence:",
@@ -1093,6 +1151,9 @@ export function generateDeveloperReport({
     "DO NOT CHANGE",
     listItems(getDoNotChangeItems(result, page.intentMode)),
     "",
+    ...(formatExistingEditorialInternalLinks(page)
+      ? [formatExistingEditorialInternalLinks(page), ""]
+      : []),
     "COMPETITOR BENCHMARK",
     formatBenchmarkInsights(benchmarkInsights),
     "",

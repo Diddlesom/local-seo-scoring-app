@@ -173,6 +173,12 @@ type InternalLinkRecommendation = {
   url: string;
 };
 
+type InternalLinkRecommendationGroups = {
+  highConfidence: InternalLinkRecommendation[];
+  mediumConfidence: InternalLinkRecommendation[];
+  rejected: InternalLinkRecommendation[];
+};
+
 const serviceTopics = [
   "laptop repair",
   "mac repair",
@@ -282,11 +288,7 @@ function topicMatches(anchorTopics: string[], destinationTopics: string[]): bool
 
 function getInternalLinkRecommendations(
   page: ReportPageDetails
-): {
-  highConfidence: InternalLinkRecommendation[];
-  mediumConfidence: InternalLinkRecommendation[];
-  rejected: InternalLinkRecommendation[];
-} {
+): InternalLinkRecommendationGroups {
   const isBlogMedia = page.intentMode === "blog-media";
   const currentPageUrl = normalizeUrlForComparison(page.url);
   const recommendations = page.relatedInternalLinks
@@ -414,11 +416,41 @@ function getInternalLinkRecommendations(
   };
 }
 
+function hasRelevantEditorialInternalLinks(
+  recommendations: InternalLinkRecommendationGroups
+): boolean {
+  return (
+    recommendations.highConfidence.length + recommendations.mediumConfidence.length >=
+    1
+  );
+}
+
 function formatInternalLinkRecommendations(page: ReportPageDetails): string {
   const recommendations = getInternalLinkRecommendations(page);
   const isBlogMedia = page.intentMode === "blog-media";
   const formatLink = (link: InternalLinkRecommendation) =>
     `- ${cleanText(link.text)} → ${link.url}\n  Reason: ${link.reason}`;
+
+  if (isBlogMedia && hasRelevantEditorialInternalLinks(recommendations)) {
+    return [
+      "Relevant editorial internal links already present.",
+      "",
+      "Detected relevant internal links",
+      ...recommendations.highConfidence.map(formatLink),
+      ...recommendations.mediumConfidence.map(formatLink),
+      "",
+      "Rejected or risky links",
+      recommendations.rejected.length > 0
+        ? recommendations.rejected
+            .map(
+              (link) =>
+                `- Do not use ${cleanText(link.text)} → ${link.url}\n  Reason: ${link.rejectedReason}`
+            )
+            .join("\n")
+        : "- No rejected links to flag"
+    ].join("\n");
+  }
+
   const highConfidence =
     recommendations.highConfidence.length > 0
       ? recommendations.highConfidence.map(formatLink).join("\n")
@@ -480,6 +512,30 @@ function formatInternalLinkRecommendations(page: ReportPageDetails): string {
     "",
     "Rejected or risky links",
     rejected
+  ].join("\n");
+}
+
+function formatExistingEditorialInternalLinks(page: ReportPageDetails): string {
+  if (page.intentMode !== "blog-media") {
+    return "";
+  }
+
+  const recommendations = getInternalLinkRecommendations(page);
+
+  if (!hasRelevantEditorialInternalLinks(recommendations)) {
+    return "";
+  }
+
+  const formatLink = (link: InternalLinkRecommendation) =>
+    `- ${cleanText(link.text)} → ${link.url}\n  Reason: ${link.reason}`;
+
+  return [
+    "INTERNAL LINK STATUS",
+    "Relevant editorial internal links already present.",
+    "",
+    "Detected relevant internal links",
+    ...recommendations.highConfidence.map(formatLink),
+    ...recommendations.mediumConfidence.map(formatLink)
   ].join("\n");
 }
 
@@ -882,6 +938,13 @@ function formatBenchmarkInsightsContext(
     "Content depth comparison:",
     `- ${cleanText(insights.contentDepthComparison)}`,
     "",
+    insights.intentMode === "blog-media"
+      ? "Topic/entity overlap:"
+      : "Topic/service overlap:",
+    ...(insights.topicServiceOverlap.length
+      ? insights.topicServiceOverlap.map((item) => `- ${cleanText(item)}`)
+      : ["- Not enough competitor overlap to identify strong patterns yet"]),
+    "",
     "Key gaps on target page:",
     ...(insights.keyGaps.length
       ? insights.keyGaps.map((gap) => `- ${cleanText(gap)}`)
@@ -1128,6 +1191,9 @@ export function generateAiTaskPack({
     `- Meta description: ${page.metaDescription ? cleanText(page.metaDescription) : "Not provided"}`,
     `- Score / grade: ${result.totalScore}/100 (${result.grade})`,
     "",
+    ...(formatExistingEditorialInternalLinks(page)
+      ? [formatExistingEditorialInternalLinks(page), ""]
+      : []),
     "COMPETITOR BENCHMARK CONTEXT",
     formatBenchmarkInsightsContext(benchmarkInsights),
     "",

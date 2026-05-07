@@ -1249,7 +1249,7 @@ function BenchmarkInsightsPanel({
       </section>
 
       <section className="insight-block">
-        <h3>Topic/service overlap</h3>
+        <h3>{isBlogMedia ? "Topic/entity overlap" : "Topic/service overlap"}</h3>
         <ResultList items={insights.topicServiceOverlap} />
       </section>
 
@@ -1605,7 +1605,8 @@ export default function Home() {
           html: form.pageContent,
           text: form.pageContent,
           headings: form.headings,
-          schemaJson: form.schemaJson
+          schemaJson: form.schemaJson,
+          relatedInternalLinks: form.reportData.relatedInternalLinks
         })
       });
 

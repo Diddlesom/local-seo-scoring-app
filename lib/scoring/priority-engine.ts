@@ -248,6 +248,67 @@ function countSchemaTypes(schemaSource: string): number {
   return schemaSource.match(/"@type"\s*:/gi)?.length ?? 0;
 }
 
+const blogMediaInternalLinkTopics = [
+  "ssd",
+  "ssd upgrade",
+  "malware",
+  "malware removal",
+  "overheating",
+  "slow startup",
+  "slow boot",
+  "startup programs",
+  "browser performance",
+  "browser tabs",
+  "remote repair",
+  "troubleshooting",
+  "checklist",
+  "windows update",
+  "ram",
+  "ram usage",
+  "hard drive",
+  "hard drive failure",
+  "antivirus"
+];
+
+function classifyBlogMediaInternalLink(url: string): "editorial" | "weak" {
+  try {
+    const path = new URL(url).pathname.toLowerCase();
+
+    if (
+      /(location|areas-we-cover|near-me|chard|ilminster|somerset|yeovil|taunton)/.test(
+        path
+      )
+    ) {
+      return "weak";
+    }
+
+    if (/(blog|news|article|articles|post|posts|guide|guides|help|faq|support|resource|resources)/.test(path)) {
+      return "editorial";
+    }
+  } catch {
+    // Fall through to topic matching.
+  }
+
+  return "weak";
+}
+
+function hasRelevantBlogMediaInternalLinks(
+  links?: ScoringInput["relatedInternalLinks"]
+): boolean {
+  if (!links || links.length === 0) {
+    return false;
+  }
+
+  return links.some((link) => {
+    const comparable = `${link.text} ${link.url}`.toLowerCase();
+    const hasTopicMatch = blogMediaInternalLinkTopics.some((topic) =>
+      comparable.includes(topic)
+    );
+
+    return hasTopicMatch && classifyBlogMediaInternalLink(link.url) === "editorial";
+  });
+}
+
 function createBlogMediaPrioritizedActions(
   input: ScoringInput,
   signals: ExtractedSignals
@@ -255,6 +316,7 @@ function createBlogMediaPrioritizedActions(
   const actions: PrioritizedAction[] = [];
   const pageText = `${input.text ?? ""}\n${input.html ?? ""}`;
   const hasInternalLinks =
+    hasRelevantBlogMediaInternalLinks(input.relatedInternalLinks) ||
     /href=["'][^"']+/i.test(input.html ?? "") ||
     /\brelated (?:articles|content|guides|resources)\b/i.test(pageText);
   const hasFaqCoverage = signals.trustSignals.includes("FAQ coverage");
