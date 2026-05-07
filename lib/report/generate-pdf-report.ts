@@ -1,9 +1,10 @@
 import { jsPDF } from "jspdf";
 import { scoringConfig } from "../scoring/config";
-import type { ScoreResult } from "../scoring/types";
+import type { IntentMode, ScoreResult } from "../scoring/types";
 
 type PdfReportInput = {
   page: {
+    intentMode?: IntentMode;
     keyword: string;
     location: string;
     url: string;
@@ -24,6 +25,13 @@ const categoryLabels: Record<keyof ScoreResult["categoryScores"], string> = {
   trust: "Trust",
   conversion: "Conversion",
   schema: "Schema"
+};
+
+const intentReportTitles: Record<IntentMode, string> = {
+  "local-seo": "Local SEO Page Report",
+  affiliate: "Affiliate Page Report",
+  saas: "SaaS Page Report",
+  "blog-media": "Blog / Media Page Report"
 };
 
 function createPdfFileName(url: string): string {
@@ -78,6 +86,7 @@ async function loadImageAsDataUrl(url: string): Promise<string | null> {
 }
 
 export async function generatePdfReport({ page, result }: PdfReportInput) {
+  const intentMode = page.intentMode ?? "local-seo";
   const doc = new jsPDF({ unit: "pt", format: "a4" });
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
@@ -171,7 +180,7 @@ export async function generatePdfReport({ page, result }: PdfReportInput) {
   doc.setFont("helvetica", "bold");
   doc.setFontSize(22);
   doc.setTextColor("#ffffff");
-  doc.text("Local SEO Page Report", margin + 116, y + 36);
+  doc.text(intentReportTitles[intentMode], margin + 116, y + 36);
   doc.setFont("helvetica", "normal");
   doc.setFontSize(10);
   doc.text("Client-facing SEO summary and action report", margin + 116, y + 56);
@@ -208,6 +217,10 @@ export async function generatePdfReport({ page, result }: PdfReportInput) {
   addSectionTitle("Category scores");
   Object.entries(result.categoryScores).forEach(([key, score]) => {
     const category = key as keyof ScoreResult["categoryScores"];
+    const categoryLabel =
+      intentMode === "blog-media" && category === "localSignals"
+        ? "Topic coverage"
+        : categoryLabels[category];
     const maxScore = scoringConfig.categoryWeights[category];
     const barWidth = 220;
     const filledWidth = Math.min((score / maxScore) * barWidth, barWidth);
@@ -216,7 +229,7 @@ export async function generatePdfReport({ page, result }: PdfReportInput) {
     doc.setFont("helvetica", "bold");
     doc.setFontSize(10);
     doc.setTextColor(dark);
-    doc.text(categoryLabels[category], margin, y);
+    doc.text(categoryLabel, margin, y);
     doc.setTextColor(green);
     doc.text(`${score} / ${maxScore}`, margin + 160, y);
     doc.setFillColor("#e8f0e8");

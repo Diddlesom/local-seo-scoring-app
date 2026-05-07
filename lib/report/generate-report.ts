@@ -96,6 +96,12 @@ function getIntentModeLabel(mode?: IntentMode): string {
   return intentModeLabels[mode ?? "local-seo"];
 }
 
+function getReportTitle(mode?: IntentMode): string {
+  return mode === "blog-media"
+    ? "BLOG / MEDIA DEVELOPER TASK SHEET"
+    : "LOCAL SEO DEVELOPER TASK SHEET";
+}
+
 function getIntentModeNotice(mode?: IntentMode): string {
   return mode && mode !== "local-seo"
     ? "This mode is in early support. Recommendations are adjusted lightly but full scoring is still being developed."
@@ -212,6 +218,26 @@ const serviceTopics = [
   "screen repair"
 ];
 
+const blogMediaInternalTopics = [
+  "ssd upgrade",
+  "ssd upgrades",
+  "malware removal",
+  "malware",
+  "overheating",
+  "slow startup",
+  "slow boot",
+  "startup programs",
+  "browser performance",
+  "browser tabs",
+  "remote repair",
+  "troubleshooting",
+  "checklist",
+  "windows updates",
+  "ram usage",
+  "hard drive failure",
+  "antivirus scans"
+];
+
 function classifyInternalUrl(url: string): InternalLinkRecommendation["pageType"] {
   try {
     const parsedUrl = new URL(url);
@@ -255,16 +281,25 @@ function slugToWords(url: string): string {
   }
 }
 
-function extractDestinationTopics(link: { text: string; url: string }): string[] {
-  return serviceTopics.filter((topic) =>
-    slugToWords(link.url).toLowerCase().includes(topic)
+function getInternalLinkTopics(mode?: IntentMode): string[] {
+  return mode === "blog-media" ? blogMediaInternalTopics : serviceTopics;
+}
+
+function extractDestinationTopics(
+  link: { text: string; url: string },
+  mode?: IntentMode
+): string[] {
+  const comparable = `${slugToWords(link.url)} ${link.text}`.toLowerCase();
+
+  return getInternalLinkTopics(mode).filter((topic) =>
+    comparable.includes(topic)
   );
 }
 
-function extractAnchorTopics(text: string): string[] {
+function extractAnchorTopics(text: string, mode?: IntentMode): string[] {
   const cleanText = text.toLowerCase();
 
-  return serviceTopics.filter((topic) => cleanText.includes(topic));
+  return getInternalLinkTopics(mode).filter((topic) => cleanText.includes(topic));
 }
 
 function topicMatches(anchorTopics: string[], destinationTopics: string[]): boolean {
@@ -285,15 +320,60 @@ function getInternalLinkRecommendations(
   mediumConfidence: InternalLinkRecommendation[];
   rejected: InternalLinkRecommendation[];
 } {
+  const isBlogMedia = page.intentMode === "blog-media";
   const currentPageUrl = normalizeUrlForComparison(page.url);
   const recommendations = page.relatedInternalLinks
     .filter((link) => normalizeUrlForComparison(link.url) !== currentPageUrl)
     .map((link): InternalLinkRecommendation => {
       const pageType = classifyInternalUrl(link.url);
-      const anchorTopics = extractAnchorTopics(link.text);
-      const destinationTopics = extractDestinationTopics(link);
+      const anchorTopics = extractAnchorTopics(link.text, page.intentMode);
+      const destinationTopics = extractDestinationTopics(link, page.intentMode);
       const displayTopic =
         destinationTopics[0] ?? anchorTopics[0] ?? cleanReportText(link.text);
+
+      if (isBlogMedia) {
+        if (
+          destinationTopics.length > 0 &&
+          (pageType === "blog_post" || pageType === "other")
+        ) {
+          return {
+            confidence: "high",
+            pageType,
+            reason: `High confidence: informational content matches ${destinationTopics[0]}.`,
+            text: link.text,
+            topic: displayTopic,
+            url: link.url
+          };
+        }
+
+        if (destinationTopics.length > 0 && pageType === "service_page") {
+          return {
+            confidence: "medium",
+            pageType,
+            reason:
+              "Medium confidence: topically related, but this appears to be a service page rather than supporting editorial content.",
+            text: link.text,
+            topic: displayTopic,
+            url: link.url
+          };
+        }
+
+        return {
+          confidence: "medium",
+          pageType,
+          reason:
+            "Rejected: Blog/Media mode should link to informational or strongly related supporting content.",
+          rejectedReason:
+            pageType === "location_page"
+              ? "Avoid generic town, service area, or local landing pages unless the article topic strongly matches."
+              : pageType === "service_page"
+                ? "Avoid service pages with weak editorial relevance."
+                : "No clear informational topic match.",
+          text: link.text,
+          topic: displayTopic,
+          url: link.url
+        };
+      }
 
       if (
         anchorTopics.length > 0 &&
@@ -370,6 +450,7 @@ function getInternalLinkRecommendations(
 
 function formatInternalLinkRecommendations(page: ReportPageDetails): string {
   const recommendations = getInternalLinkRecommendations(page);
+  const isBlogMedia = page.intentMode === "blog-media";
   const formatLink = (link: InternalLinkRecommendation) =>
     `- ${cleanReportText(link.text)} → ${link.url}\n  Reason: ${link.reason}`;
   const highConfidence =
@@ -381,7 +462,11 @@ function formatInternalLinkRecommendations(page: ReportPageDetails): string {
       ? recommendations.mediumConfidence
           .map(
             (link) =>
-              `${formatLink(link)}\n  Warning: Medium confidence: not a dedicated service page.`
+              `${formatLink(link)}\n  Warning: ${
+                isBlogMedia
+                  ? "Medium confidence: useful topic match, but check it supports the article intent."
+                  : "Medium confidence: not a dedicated service page."
+              }`
           )
           .join("\n")
       : "- No suitable medium-confidence link found";
@@ -409,7 +494,9 @@ function formatInternalLinkRecommendations(page: ReportPageDetails): string {
       "- No suitable link found",
       "",
       "No suitable link found",
-      "Do not force an internal link. Create or confirm a dedicated page first.",
+      isBlogMedia
+        ? "Do not force an internal link. Create or confirm a relevant guide, checklist, or supporting article first."
+        : "Do not force an internal link. Create or confirm a dedicated page first.",
       "",
       "Rejected or risky links",
       rejected
@@ -705,7 +792,11 @@ function formatBenchmarkInsights(insights?: BenchmarkInsights | null): string {
   ].join("\n");
 }
 
-function getDoNotChangeItems(result: ScoreResult): string[] {
+function getDoNotChangeItems(
+  result: ScoreResult,
+  mode?: IntentMode
+): string[] {
+  const isBlogMedia = mode === "blog-media";
   const items: string[] = [];
 
   if (
@@ -722,7 +813,9 @@ function getDoNotChangeItems(result: ScoreResult): string[] {
 
   if (result.signals.headings.h2.length > 0) {
     items.push(
-      "Existing service sections/headings are useful. Improve them rather than replacing them."
+      isBlogMedia
+        ? "Existing article sections/headings are useful. Improve them rather than replacing them."
+        : "Existing service sections/headings are useful. Improve them rather than replacing them."
     );
   }
 
@@ -805,14 +898,22 @@ function getTaskDetails(
   }
 
   if (cleanAction.includes("internal links")) {
+    const isBlogMedia = page.intentMode === "blog-media";
+
     return {
       whereToImplement:
-        "Inside relevant service sections in the main page content.",
+        isBlogMedia
+          ? "Inside relevant article sections in the main page content."
+          : "Inside relevant service sections in the main page content.",
       whatToChange:
-        "Add only contextually relevant internal links where the anchor topic matches the destination topic.",
+        isBlogMedia
+          ? "Add only contextually relevant internal links to supporting articles, guides, checklists, or explainers where the topic matches the article section."
+          : "Add only contextually relevant internal links where the anchor topic matches the destination topic.",
       example: formatInternalLinkRecommendations(page),
       expectedOutcome:
-        "Visitors and search engines can move more easily between related service pages."
+        isBlogMedia
+          ? "Readers and search engines can move more easily between related editorial topic-cluster content."
+          : "Visitors and search engines can move more easily between related service pages."
     };
   }
 
@@ -973,7 +1074,7 @@ export function generateDeveloperReport({
   benchmarkInsights
 }: GenerateReportInput): string {
   return [
-    "LOCAL SEO DEVELOPER TASK SHEET",
+    getReportTitle(page.intentMode),
     "",
     ...getAssistantInstructions(),
     "",
@@ -990,7 +1091,7 @@ export function generateDeveloperReport({
     `- Score / grade: ${result.totalScore}/100 (${result.grade})`,
     "",
     "DO NOT CHANGE",
-    listItems(getDoNotChangeItems(result)),
+    listItems(getDoNotChangeItems(result, page.intentMode)),
     "",
     "COMPETITOR BENCHMARK",
     formatBenchmarkInsights(benchmarkInsights),

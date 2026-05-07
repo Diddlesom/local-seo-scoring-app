@@ -863,15 +863,17 @@ function buildBenchmarkInsights({
     averageTrustSignals
   );
   const serviceGap = getRelativeGap(targetTopics.length, averageTopicCount);
+  const coverageLabel =
+    intentMode === "blog-media" ? "topic coverage" : "service coverage";
   const belowAverageAreas = [
     contentGap > 0 ? "content depth" : "",
     trustGap > 0 ? "trust signals" : "",
-    serviceGap > 0 ? "service coverage" : ""
+    serviceGap > 0 ? coverageLabel : ""
   ].filter(Boolean);
   const competitiveAreas = [
     contentGap <= 0 ? "content depth" : "",
     trustGap <= 0 ? "trust signals" : "",
-    serviceGap <= 0 ? "service coverage" : ""
+    serviceGap <= 0 ? coverageLabel : ""
   ].filter(Boolean);
   const summaryText =
     belowAverageAreas.length > 0 && competitiveAreas.length > 0
@@ -1042,15 +1044,19 @@ function buildBenchmarkInsights({
   };
 }
 
-function formatIssueText(issue: string): string {
+function formatIssueText(issue: string, intentMode: IntentMode): string {
   if (issue.toLowerCase().includes("page content is thin")) {
-    return "⚠️ Low content depth detected. Expand service sections and add more local detail to improve rankings.";
+    return intentMode === "blog-media"
+      ? "⚠️ Low content depth detected. Expand article sections with more semantic detail, examples, and supporting links."
+      : "⚠️ Low content depth detected. Expand service sections and add more local detail to improve rankings.";
   }
 
   if (
     issue === "Low content depth detected. Add more service detail to improve rankings."
   ) {
-    return "⚠️ Low content depth detected. Expand service sections and add more local detail to improve rankings.";
+    return intentMode === "blog-media"
+      ? "⚠️ Low content depth detected. Expand article sections with more semantic detail, examples, and supporting links."
+      : "⚠️ Low content depth detected. Expand service sections and add more local detail to improve rankings.";
   }
 
   return issue;
@@ -1083,7 +1089,7 @@ function TopIssues({
       {issues.length > 0 ? (
         <ul>
           {issues.map((issue) => (
-            <li key={issue}>{formatIssueText(issue)}</li>
+            <li key={issue}>{formatIssueText(issue, intentMode)}</li>
           ))}
         </ul>
       ) : (
@@ -1830,6 +1836,7 @@ export default function Home() {
     try {
       await generatePdfReport({
         page: {
+          intentMode: form.intentMode,
           keyword: form.keyword,
           location: form.location,
           url: form.websiteUrl,
