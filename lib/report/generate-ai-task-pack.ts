@@ -906,7 +906,8 @@ function getDoNotTouchList(
 
 function getValidationSteps(
   action: PrioritizedAction,
-  executionMode: ExecutionMode
+  executionMode: ExecutionMode,
+  intentMode?: IntentMode
 ): string[] {
   const cleanAction = action.action.toLowerCase();
 
@@ -936,10 +937,10 @@ function getValidationSteps(
 
   if (cleanAction.includes("schema blocks") || cleanAction.includes("consolidate")) {
     return [
-      page.intentMode === "affiliate"
+      intentMode === "affiliate"
         ? "List all detected Product, Review, ItemList, and FAQPage schema blocks and their source if known."
         : "List all detected schema blocks and their source if known.",
-      page.intentMode === "affiliate"
+      intentMode === "affiliate"
         ? "Identify duplicate or conflicting product, review, list, or FAQ fields."
         : "Identify duplicate or conflicting LocalBusiness fields.",
       "Stop and wait for approval before making any change."
@@ -998,7 +999,7 @@ function formatTask(
     ...getDoNotTouchList(action, executionMode).map((item) => `- ${item}`),
     "",
     "Validation steps:",
-    ...getValidationSteps(action, executionMode).map((step) => `- ${step}`),
+    ...getValidationSteps(action, executionMode, page.intentMode).map((step) => `- ${step}`),
     "",
     "Stop condition:",
     getStopCondition(action)
