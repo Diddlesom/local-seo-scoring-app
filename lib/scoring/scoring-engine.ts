@@ -33,6 +33,10 @@ function getGrade(totalScore: number): ScoreResult["grade"] {
 function createCategoryScores(
   signals: ReturnType<typeof extractSignals>
 ): CategoryScores {
+  const localSchemaTypes = signals.schemaTypes.filter((type) =>
+    ["LocalBusiness", "Service", "FAQPage"].includes(type)
+  );
+
   return {
     content: signals.wordCount >= 500 ? 15 : signals.wordCount >= 250 ? 10 : 5,
     headings:
@@ -51,7 +55,7 @@ function createCategoryScores(
       (signals.hasPhoneNumber ? 7 : 0),
     trust: Math.min(signals.trustSignals.length * 2, 10),
     conversion: Math.min(signals.ctaWords.length * 3, 10),
-    schema: Math.min(signals.schemaTypes.length * 5, 15)
+    schema: Math.min(localSchemaTypes.length * 5, 15)
   };
 }
 
@@ -81,12 +85,41 @@ function createBlogMediaCategoryScores(
   };
 }
 
+function createAffiliateCategoryScores(
+  signals: ReturnType<typeof extractSignals>
+): CategoryScores {
+  const affiliateSchemaTypes = signals.schemaTypes.filter((type) =>
+    ["Product", "Review", "ItemList", "FAQPage", "Article"].includes(type)
+  );
+
+  return {
+    content: signals.wordCount >= 1000 ? 15 : signals.wordCount >= 600 ? 10 : 5,
+    headings:
+      signals.headings.h1.length > 0 &&
+      signals.headings.h2.length + signals.headings.h3.length >= 4
+        ? 15
+        : signals.headings.h1.length > 0
+          ? 10
+          : 0,
+    metadata:
+      (signals.titleKeywordMatch ? 10 : 0) +
+      (signals.metaDescriptionKeywordMatch ? 10 : 0),
+    localSignals: Math.min(signals.topicSignals.length * 3, 15),
+    trust: Math.min(signals.trustSignals.length * 2, 10),
+    conversion: Math.min(signals.ctaWords.length * 3, 10),
+    schema: Math.min(affiliateSchemaTypes.length * 5, 15)
+  };
+}
+
 function createStrengths(
   signals: ReturnType<typeof extractSignals>,
   categoryScores: CategoryScores,
   intentMode: IntentMode = "local-seo"
 ): string[] {
   const strengths: string[] = [];
+  const localSchemaTypes = signals.schemaTypes.filter((type) =>
+    ["LocalBusiness", "Service", "FAQPage"].includes(type)
+  );
 
   if (categoryScores.content >= 10) {
     strengths.push("Page has a useful amount of written content.");
@@ -120,6 +153,26 @@ function createStrengths(
     return strengths;
   }
 
+  if (intentMode === "affiliate") {
+    if (signals.topicSignals.length > 0) {
+      strengths.push(
+        `Page includes Affiliate buyer-intent signals: ${signals.topicSignals.join(", ")}.`
+      );
+    }
+
+    if (signals.trustSignals.length > 0) {
+      strengths.push(
+        `Page includes affiliate trust signals: ${signals.trustSignals.join(", ")}.`
+      );
+    }
+
+    if (signals.schemaTypes.length > 0) {
+      strengths.push("Page includes supported schema markup.");
+    }
+
+    return strengths;
+  }
+
   if (signals.locationMentionCount > 0) {
     strengths.push("Page mentions the target location.");
   }
@@ -138,7 +191,7 @@ function createStrengths(
     strengths.push("Page includes call-to-action wording.");
   }
 
-  if (signals.schemaTypes.length > 0) {
+  if (localSchemaTypes.length > 0) {
     strengths.push("Page includes supported schema markup.");
   }
 
@@ -151,6 +204,9 @@ function createWeaknesses(
   intentMode: IntentMode = "local-seo"
 ): string[] {
   const weaknesses: string[] = [];
+  const localSchemaTypes = signals.schemaTypes.filter((type) =>
+    ["LocalBusiness", "Service", "FAQPage"].includes(type)
+  );
 
   if (categoryScores.content < 10) {
     weaknesses.push("Page content is thin.");
@@ -192,6 +248,34 @@ function createWeaknesses(
     return weaknesses;
   }
 
+  if (intentMode === "affiliate") {
+    if (signals.topicSignals.length < 3) {
+      weaknesses.push(
+        "Affiliate buyer intent coverage is light."
+      );
+    }
+
+    if (signals.trustSignals.length < 3) {
+      weaknesses.push(
+        "Affiliate trust signals are limited."
+      );
+    }
+
+    if (signals.ctaWords.length === 0) {
+      weaknesses.push("No clear reader next-step wording was found.");
+    }
+
+    if (
+      !signals.schemaTypes.some((type) =>
+        ["Product", "Review", "ItemList", "FAQPage"].includes(type)
+      )
+    ) {
+      weaknesses.push("No Affiliate-supported schema markup was found.");
+    }
+
+    return weaknesses;
+  }
+
   if (!signals.metaDescriptionLocationMatch) {
     weaknesses.push("Meta description does not include the target location.");
   }
@@ -212,7 +296,7 @@ function createWeaknesses(
     weaknesses.push("No clear call-to-action wording was found.");
   }
 
-  if (signals.schemaTypes.length === 0) {
+  if (localSchemaTypes.length === 0) {
     weaknesses.push("No supported schema markup was found.");
   }
 
@@ -227,6 +311,8 @@ export function scoreLocalSeo(input: ScoringInput): ScoreResult {
   const categoryScores =
     intentMode === "blog-media"
       ? createBlogMediaCategoryScores(signals)
+      : intentMode === "affiliate"
+        ? createAffiliateCategoryScores(signals)
       : createCategoryScores(signals);
   const totalScore = Object.values(categoryScores).reduce(
     (total, score) => total + score,

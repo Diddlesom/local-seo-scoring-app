@@ -402,7 +402,26 @@ function extractRelatedInternalLinks(
     "windows update",
     "ram",
     "hard drive",
-    "antivirus"
+    "antivirus",
+    "review",
+    "reviews",
+    "comparison",
+    "compare",
+    "best",
+    "best-of",
+    "roundup",
+    "buying guide",
+    "buyer guide",
+    "alternatives",
+    "vs",
+    "versus",
+    "product",
+    "products",
+    "pricing",
+    "price",
+    "deal",
+    "discount",
+    "value"
   ];
   const links = new Map<string, { score: number; text: string; url: string }>();
   let match = linkPattern.exec(html);

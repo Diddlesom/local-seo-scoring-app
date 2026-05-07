@@ -373,6 +373,55 @@ const blogMediaTopicPatterns: Array<{ label: string; patterns: RegExp[] }> = [
   }
 ];
 
+const affiliateTopicPatterns: Array<{ label: string; patterns: RegExp[] }> = [
+  {
+    label: "product entities",
+    patterns: [
+      /\b(?:product|products|model|models|brand|brands|device|devices|tool|tools|software|platform|platforms)\b/i,
+      /\b[A-Z][A-Za-z0-9]+(?:\s+[A-Z][A-Za-z0-9]+){1,3}\b/
+    ]
+  },
+  {
+    label: "product categories",
+    patterns: [
+      /\b(?:category|categories|type|types|budget|premium|entry-level|mid-range|professional|consumer|business)\b/i
+    ]
+  },
+  {
+    label: "comparison criteria",
+    patterns: [
+      /\b(?:comparison table|compare|compared|versus| vs\.? |side-by-side|criteria|specs|features)\b/i,
+      /<table[\s>]/i
+    ]
+  },
+  {
+    label: "pros and cons",
+    patterns: [/\b(?:pros?|cons?|advantages?|disadvantages?|drawbacks?)\b/i]
+  },
+  {
+    label: "pricing/value language",
+    patterns: [/\b(?:price|pricing|cost|value|cheap|budget|deal|discount|save|worth it|money)\b/i]
+  },
+  {
+    label: "buyer intent sections",
+    patterns: [
+      /\b(?:best for|best overall|best budget|best value|buying guide|buyer guide|how to choose|what to look for|before you buy)\b/i
+    ]
+  },
+  {
+    label: "review/testing trust signals",
+    patterns: [
+      /\b(?:reviewed|tested|hands-on|first-hand|in our testing|we tried|we used|benchmarked|review unit)\b/i
+    ]
+  },
+  {
+    label: "affiliate disclosure signals",
+    patterns: [
+      /\b(?:affiliate disclosure|affiliate links?|commission|we may earn|reader-supported|sponsored)\b/i
+    ]
+  }
+];
+
 const executionModes: Array<{
   description: string;
   label: string;
@@ -443,6 +492,12 @@ function detectTopicsServices(
       .map((topic) => topic.label);
   }
 
+  if (intentMode === "affiliate") {
+    return affiliateTopicPatterns
+      .filter((topic) => topic.patterns.some((pattern) => pattern.test(text)))
+      .map((topic) => topic.label);
+  }
+
   const cleanText = text.toLowerCase();
   const keywords = intentTopicKeywords[intentMode] ?? localTopicKeywords;
 
@@ -470,13 +525,17 @@ function getBenchmarkGaps({
 
   if (competitor.signals.wordCount > targetResult.signals.wordCount + 150) {
     gaps.add(
-      "Add more useful service detail because this competitor has deeper page content than your target page."
+      intentMode === "affiliate"
+        ? "Add more useful buyer detail because this competitor has deeper page content than your target page."
+        : "Add more useful service detail because this competitor has deeper page content than your target page."
     );
   }
 
   if (competitorHeadingCount > targetHeadingCount + 2) {
     gaps.add(
-      "Expand the page structure with clearer service subheadings because this competitor uses more headings."
+      intentMode === "affiliate"
+        ? "Expand the page structure with clearer buyer sections because this competitor uses more headings."
+        : "Expand the page structure with clearer service subheadings because this competitor uses more headings."
     );
   }
 
@@ -499,7 +558,9 @@ function getBenchmarkGaps({
   competitorTopics.forEach((topic) => {
     if (!targetTopics.includes(topic)) {
       gaps.add(
-        `Add a clear mention or short section for ${topic} because competitors cover it and your target page does not.`
+        intentMode === "affiliate"
+          ? `Add buyer-intent coverage for ${topic} because competitors cover it and your target page does not.`
+          : `Add a clear mention or short section for ${topic} because competitors cover it and your target page does not.`
       );
     }
   });
@@ -644,6 +705,10 @@ function simplifyBenchmarkGap(gap: string): string {
     return "One competitor has deeper content";
   }
 
+  if (cleanGap.includes("buyer sections")) {
+    return "Fewer buyer sections than competitors";
+  }
+
   if (cleanGap.includes("more headings")) {
     return "Fewer service subheadings than competitors";
   }
@@ -660,6 +725,13 @@ function simplifyBenchmarkGap(gap: string): string {
     const trustSignal = trustMatch?.[1] ?? "trust proof";
 
     return `Missing ${trustSignal} (used by competitors)`;
+  }
+
+  if (cleanGap.includes("buyer-intent coverage for")) {
+    const topicMatch = gap.match(/for (.*?) because/i);
+    const topic = topicMatch?.[1] ?? "buyer intent";
+
+    return `Missing ${topic} coverage`;
   }
 
   if (cleanGap.includes("short section for")) {
@@ -745,11 +817,15 @@ function getTopRecommendedNextStep({
   const trustAction =
     intentMode === "blog-media"
       ? "Improve editorial trust with author expertise, first-hand experience, freshness signals, citations, or related resources."
-      : "Improve trust signals with visible reviews, testimonials, guarantees, or named expert proof.";
+      : intentMode === "affiliate"
+        ? "Improve affiliate trust signals with disclosure, author/reviewer expertise, first-hand testing notes, and freshness signals."
+        : "Improve trust signals with visible reviews, testimonials, guarantees, or named expert proof.";
   const topicAction =
     intentMode === "blog-media"
       ? "Expand informational coverage with semantic depth, troubleshooting detail, and PAA-style questions."
-      : "Expand service coverage for important services competitors mention but your page does not.";
+      : intentMode === "affiliate"
+        ? "Expand buyer intent coverage with comparison criteria, pros and cons, best-for labels, and buyer guide detail."
+        : "Expand service coverage for important services competitors mention but your page does not.";
 
   const gaps = [
     {
@@ -836,7 +912,9 @@ function buildBenchmarkInsights({
     .filter((topic) => !targetTopics.includes(topic.value))
     .map(
       (topic) =>
-        `Add ${topic.value} coverage because ${formatCompetitorCount(topic.count, competitors.length)} mention it.`
+        `Add ${topic.value} ${
+          intentMode === "affiliate" ? "buyer intent coverage" : "coverage"
+        } because ${formatCompetitorCount(topic.count, competitors.length)} mention it.`
     );
   const missingMajorityTrustSignals = majorityTrustSignals
     .filter((signal) => !targetResult.signals.trustSignals.includes(signal.value))
@@ -864,7 +942,11 @@ function buildBenchmarkInsights({
   );
   const serviceGap = getRelativeGap(targetTopics.length, averageTopicCount);
   const coverageLabel =
-    intentMode === "blog-media" ? "topic coverage" : "service coverage";
+    intentMode === "blog-media"
+      ? "topic coverage"
+      : intentMode === "affiliate"
+        ? "buyer intent coverage"
+        : "service coverage";
   const belowAverageAreas = [
     contentGap > 0 ? "content depth" : "",
     trustGap > 0 ? "trust signals" : "",
@@ -889,7 +971,9 @@ function buildBenchmarkInsights({
             `Competitor average: ${averageWordCount} words`,
             intentMode === "blog-media"
               ? "Add more semantic depth, examples, and practical editorial detail"
-              : "Add more service detail and local relevance"
+              : intentMode === "affiliate"
+                ? "Add more buyer detail, comparison criteria, and product decision support"
+                : "Add more service detail and local relevance"
           ]
         : [],
     trustSignals:
@@ -900,6 +984,13 @@ function buildBenchmarkInsights({
             "Add freshness/date signals",
             "Add citations or supporting resources"
           ]
+        : intentMode === "affiliate"
+          ? [
+              "Add a clear affiliate disclosure",
+              "Add author or reviewer expertise",
+              "Add first-hand testing notes where accurate",
+              "Add freshness/date signals"
+            ]
         : [
             "Add testimonials (used by competitors)",
             "Add customer-style review wording",
@@ -913,6 +1004,13 @@ function buildBenchmarkInsights({
             "Expand troubleshooting sections",
             "Add PAA-style questions and answers"
           ]
+        : intentMode === "affiliate"
+          ? [
+              "Add comparison criteria",
+              "Add pros and cons",
+              "Add best-for labels",
+              "Add a buyer guide section"
+            ]
         : [
             "Add a computer repair section",
             "Add a pc repair section",
@@ -924,6 +1022,12 @@ function buildBenchmarkInsights({
             "Add examples, checklists, or comparison tables",
             "Improve media richness with useful screenshots, diagrams, or video"
           ]
+        : intentMode === "affiliate"
+          ? [
+              "Add a comparison table",
+              "Break recommendations into clearer buyer sections",
+              "Add Product, Review, ItemList, or FAQPage schema where appropriate"
+            ]
         : [
             "Add more service subheadings",
             "Break content into clearer sections"
@@ -950,10 +1054,14 @@ function buildBenchmarkInsights({
       serviceGap > 0
         ? intentMode === "blog-media"
           ? "Topic coverage is below the competitor average."
-          : "Service coverage is below the competitor average."
+          : intentMode === "affiliate"
+            ? "Buyer intent coverage is below the competitor average."
+            : "Service coverage is below the competitor average."
         : intentMode === "blog-media"
           ? "Topic coverage is competitive against the current benchmark."
-          : "Service coverage is competitive against the current benchmark.",
+          : intentMode === "affiliate"
+            ? "Buyer intent coverage is competitive against the current benchmark."
+            : "Service coverage is competitive against the current benchmark.",
       belowAverageAreas.length > 0
         ? `Summary: your page is behind competitors on ${belowAverageAreas.join(", ")}.`
         : "Summary: your page is broadly competitive against the current competitor set."
@@ -1048,6 +1156,8 @@ function formatIssueText(issue: string, intentMode: IntentMode): string {
   if (issue.toLowerCase().includes("page content is thin")) {
     return intentMode === "blog-media"
       ? "⚠️ Low content depth detected. Expand article sections with more semantic detail, examples, and supporting links."
+      : intentMode === "affiliate"
+        ? "⚠️ Low content depth detected. Expand buyer sections with product detail, comparison criteria, and decision support."
       : "⚠️ Low content depth detected. Expand service sections and add more local detail to improve rankings.";
   }
 
@@ -1056,6 +1166,8 @@ function formatIssueText(issue: string, intentMode: IntentMode): string {
   ) {
     return intentMode === "blog-media"
       ? "⚠️ Low content depth detected. Expand article sections with more semantic detail, examples, and supporting links."
+      : intentMode === "affiliate"
+        ? "⚠️ Low content depth detected. Expand buyer sections with product detail, comparison criteria, and decision support."
       : "⚠️ Low content depth detected. Expand service sections and add more local detail to improve rankings.";
   }
 
@@ -1102,6 +1214,8 @@ function TopIssues({
         Why this matters:{" "}
         {intentMode === "blog-media"
           ? "Pages with stronger semantic depth, editorial trust signals, and related internal links tend to perform better for informational searches."
+          : intentMode === "affiliate"
+            ? "Pages with stronger buyer intent coverage, affiliate trust signals, and relevant comparison links tend to perform better for commercial searches."
           : "Pages with stronger content depth, trust signals, and internal linking tend to perform better for local service searches."}
       </p>
       <a className="guided-link" href="#recommended-actions">
@@ -1125,6 +1239,8 @@ function CategoryScoreBar({
   const categoryLabel =
     intentMode === "blog-media" && category === "localSignals"
       ? "Topic coverage"
+      : intentMode === "affiliate" && category === "localSignals"
+        ? "Buyer intent coverage"
       : categoryLabels[category];
 
   return (
@@ -1198,11 +1314,16 @@ function BenchmarkInsightsPanel({
   insights: BenchmarkInsights;
 }) {
   const isBlogMedia = insights.intentMode === "blog-media";
+  const isAffiliate = insights.intentMode === "affiliate";
   const actionGroups = [
     ["Increase content depth", insights.priorityActionGroups.contentDepth],
     ["Improve trust signals", insights.priorityActionGroups.trustSignals],
     [
-      isBlogMedia ? "Expand topic coverage" : "Expand service coverage",
+      isBlogMedia
+        ? "Expand topic coverage"
+        : isAffiliate
+          ? "Expand buyer intent coverage"
+          : "Expand service coverage",
       insights.priorityActionGroups.serviceCoverage
     ],
     ["Improve page structure", insights.priorityActionGroups.pageStructure]
@@ -1228,7 +1349,13 @@ function BenchmarkInsightsPanel({
             {insights.overallPositionSections.trustSignals}
           </p>
           <p>
-            <strong>{isBlogMedia ? "Topic coverage" : "Service coverage"}</strong>
+            <strong>
+              {isBlogMedia
+                ? "Topic coverage"
+                : isAffiliate
+                  ? "Buyer intent coverage"
+                  : "Service coverage"}
+            </strong>
             {insights.overallPositionSections.serviceCoverage}
           </p>
           <p>
@@ -1249,7 +1376,13 @@ function BenchmarkInsightsPanel({
       </section>
 
       <section className="insight-block">
-        <h3>{isBlogMedia ? "Topic/entity overlap" : "Topic/service overlap"}</h3>
+        <h3>
+          {isBlogMedia
+            ? "Topic/entity overlap"
+            : isAffiliate
+              ? "Product/entity overlap"
+              : "Topic/service overlap"}
+        </h3>
         <ResultList items={insights.topicServiceOverlap} />
       </section>
 
@@ -2201,7 +2334,13 @@ export default function Home() {
                       </dd>
                     </div>
                     <div>
-                      <dt>Topics/services detected</dt>
+                      <dt>
+                        {form.intentMode === "affiliate"
+                          ? "Products/buyer topics detected"
+                          : form.intentMode === "blog-media"
+                            ? "Topics/entities detected"
+                            : "Topics/services detected"}
+                      </dt>
                       <dd>
                         <InlineList items={benchmark.topicsServices} />
                       </dd>

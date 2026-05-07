@@ -11,5 +11,13 @@ export const scoringConfig = {
   },
   trustSignalWords: ["reviews", "no fix no fee", "warranty", "years experience"],
   ctaWords: ["call", "contact", "book", "quote", "get help"],
-  schemaTypes: ["LocalBusiness", "Service", "FAQPage"]
+  schemaTypes: [
+    "LocalBusiness",
+    "Service",
+    "FAQPage",
+    "Product",
+    "Review",
+    "ItemList",
+    "Article"
+  ]
 } as const;

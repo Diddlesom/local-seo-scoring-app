@@ -57,6 +57,50 @@ export function createPriorityActions(
     return actions;
   }
 
+  if (intentMode === "affiliate") {
+    if (!signals.titleKeywordMatch) {
+      actions.push({
+        id: "add-buyer-topic-to-title",
+        title: "Make the buyer-intent topic clear in the page title",
+        priority: "high"
+      });
+    }
+
+    if (!signals.metaDescriptionKeywordMatch) {
+      actions.push({
+        id: "add-buyer-topic-to-meta-description",
+        title: "Make the buyer-intent topic clear in the meta description",
+        priority: "medium"
+      });
+    }
+
+    if (!signals.topicSignals.includes("Comparison tables/criteria")) {
+      actions.push({
+        id: "add-comparison-table",
+        title: "Add a comparison table or clear comparison criteria",
+        priority: "high"
+      });
+    }
+
+    if (!signals.topicSignals.includes("Pros and cons")) {
+      actions.push({
+        id: "add-pros-and-cons",
+        title: "Add pros and cons for the products or options covered",
+        priority: "medium"
+      });
+    }
+
+    if (!signals.trustSignals.includes("Affiliate disclosure")) {
+      actions.push({
+        id: "add-affiliate-disclosure",
+        title: "Add a clear affiliate disclosure",
+        priority: "high"
+      });
+    }
+
+    return actions;
+  }
+
   if (!signals.titleKeywordMatch) {
     actions.push({
       id: "add-keyword-to-title",
@@ -105,7 +149,11 @@ export function createPriorityActions(
     });
   }
 
-  if (signals.schemaTypes.length === 0) {
+  if (
+    !signals.schemaTypes.some((type) =>
+      ["LocalBusiness", "Service", "FAQPage"].includes(type)
+    )
+  ) {
     actions.push({
       id: "add-local-schema",
       title: "Add LocalBusiness, Service, or FAQPage schema",
@@ -281,6 +329,30 @@ const blogMediaInternalLinkTopics = [
   "antivirus"
 ];
 
+const affiliateInternalLinkTopics = [
+  "review",
+  "reviews",
+  "best",
+  "best-of",
+  "roundup",
+  "comparison",
+  "compare",
+  "vs",
+  "versus",
+  "buying guide",
+  "buyer guide",
+  "buyers guide",
+  "how-to buyer",
+  "product",
+  "products",
+  "alternatives",
+  "pricing",
+  "price",
+  "deal",
+  "discount",
+  "value"
+];
+
 function classifyBlogMediaInternalLink(url: string): "editorial" | "weak" {
   try {
     const path = new URL(url).pathname.toLowerCase();
@@ -367,6 +439,35 @@ function hasRelevantBlogMediaInternalLinks(
   });
 
   return relevantLinks.length >= 2;
+}
+
+function isWeakAffiliateInternalUrl(url: string): boolean {
+  try {
+    return /(location|areas-we-cover|near-me|service-area|chard|ilminster|somerset|yeovil|taunton)/.test(
+      new URL(url).pathname.toLowerCase()
+    );
+  } catch {
+    return false;
+  }
+}
+
+function hasRelevantAffiliateInternalLinks(
+  links?: ScoringInput["relatedInternalLinks"]
+): boolean {
+  if (!links || links.length === 0) {
+    return false;
+  }
+
+  const relevantLinks = links.filter((link) => {
+    const comparable = `${link.text} ${link.url}`.toLowerCase();
+    const hasTopicMatch = affiliateInternalLinkTopics.some((topic) =>
+      comparable.includes(topic)
+    );
+
+    return hasTopicMatch && !isWeakAffiliateInternalUrl(link.url);
+  });
+
+  return relevantLinks.length >= 1;
 }
 
 function createBlogMediaPrioritizedActions(
@@ -490,6 +591,221 @@ function createBlogMediaPrioritizedActions(
     .sort((a, b) => b.estimatedScoreGain - a.estimatedScoreGain);
 }
 
+function createAffiliatePrioritizedActions(
+  input: ScoringInput,
+  signals: ExtractedSignals
+): PrioritizedAction[] {
+  const actions: PrioritizedAction[] = [];
+  const pageText = `${input.text ?? ""}\n${input.html ?? ""}`;
+  const schemaSource = input.schemaJson ?? "";
+  const detectedInternalLinks = [
+    ...(input.relatedInternalLinks ?? []),
+    ...extractInternalLinksFromHtml(input.websiteUrl, input.html)
+  ];
+  const schemaTypes = new Set(signals.schemaTypes);
+  const hasComparison = signals.topicSignals.includes(
+    "Comparison tables/criteria"
+  );
+  const hasProsCons = signals.topicSignals.includes("Pros and cons");
+  const hasBestFor = signals.topicSignals.includes("Best-for sections");
+  const hasBuyerGuide = signals.topicSignals.includes("Buyer guide sections");
+  const hasPricing = signals.topicSignals.includes("Pricing/value language");
+  const hasAffiliateDisclosure =
+    signals.trustSignals.includes("Affiliate disclosure") ||
+    /\b(?:affiliate disclosure|affiliate links?|commission|we may earn|reader-supported)\b/i.test(
+      pageText
+    );
+  const hasExpertise = signals.trustSignals.includes("Author/reviewer expertise");
+  const hasTesting = signals.trustSignals.includes(
+    "First-hand testing/review wording"
+  );
+  const hasFaqCoverage = signals.trustSignals.includes("FAQs");
+  const hasRelevantInternalLinks =
+    hasRelevantAffiliateInternalLinks(detectedInternalLinks) ||
+    /\b(?:related reviews|related comparisons|buying guides|best-of roundups)\b/i.test(
+      pageText
+    );
+  const hasProductSchema = schemaTypes.has("Product");
+  const hasReviewSchema = schemaTypes.has("Review");
+  const hasItemListSchema = schemaTypes.has("ItemList");
+  const hasFaqSchema = schemaTypes.has("FAQPage");
+
+  if (!signals.titleKeywordMatch) {
+    actions.push(
+      createAction({
+        impact: 8,
+        ease: 8,
+        action: "Make the buyer-intent topic clear in the page title.",
+        whyItMatters:
+          "Affiliate pages need an obvious buyer-intent promise so readers know the page covers products, reviews, comparisons, or buying guidance."
+      })
+    );
+  }
+
+  if (!hasComparison) {
+    actions.push(
+      createAction({
+        impact: 8,
+        ease: 6,
+        action: "Add a comparison table with clear buyer criteria.",
+        whyItMatters:
+          "Comparison tables help readers compare options quickly and make affiliate content more useful for buyer-intent searches."
+      })
+    );
+  }
+
+  if (!hasProsCons) {
+    actions.push(
+      createAction({
+        impact: 7,
+        ease: 7,
+        action: "Add pros and cons for each major product or option.",
+        whyItMatters:
+          "Pros and cons make the page more transparent and help readers decide which option fits their needs."
+      })
+    );
+  }
+
+  if (!hasBestFor) {
+    actions.push(
+      createAction({
+        impact: 7,
+        ease: 7,
+        action: "Add 'best for' labels to clarify which product suits which buyer.",
+        whyItMatters:
+          "Best-for labels turn broad recommendations into practical buying guidance."
+      })
+    );
+  }
+
+  if (!hasBuyerGuide) {
+    actions.push(
+      createAction({
+        impact: 7,
+        ease: 6,
+        action: "Add a buyer guide section explaining how to choose.",
+        whyItMatters:
+          "Buyer guide sections improve decision support and reduce thin roundup-style content."
+      })
+    );
+  }
+
+  if (!hasAffiliateDisclosure) {
+    actions.push(
+      createAction({
+        impact: 8,
+        ease: 8,
+        action: "Add a clear affiliate disclosure near the top of the page.",
+        whyItMatters:
+          "Affiliate disclosures build reader trust and support transparent monetised content."
+      })
+    );
+  }
+
+  if (!hasExpertise) {
+    actions.push(
+      createAction({
+        impact: 6,
+        ease: 6,
+        action: "Add author or reviewer expertise details.",
+        whyItMatters:
+          "Reviewer credentials help readers understand why they should trust the recommendations."
+      })
+    );
+  }
+
+  if (!hasTesting) {
+    actions.push(
+      createAction({
+        impact: 6,
+        ease: 5,
+        action: "Add first-hand testing notes where accurate.",
+        whyItMatters:
+          "First-hand review details make affiliate recommendations more credible than generic product summaries."
+      })
+    );
+  }
+
+  if (!hasPricing) {
+    actions.push(
+      createAction({
+        impact: 5,
+        ease: 6,
+        action: "Add price, value, or budget guidance.",
+        whyItMatters:
+          "Pricing and value context helps readers decide which option is realistic for their budget."
+      })
+    );
+  }
+
+  if (!hasFaqCoverage) {
+    actions.push(
+      createAction({
+        impact: 5,
+        ease: 7,
+        action: "Add a short FAQ section for buyer questions.",
+        whyItMatters:
+          "FAQs help answer late-stage buying questions and can support FAQPage schema where appropriate."
+      })
+    );
+  }
+
+  if (!hasRelevantInternalLinks) {
+    actions.push(
+      createAction({
+        impact: 5,
+        ease: 6,
+        action:
+          "Add internal links to relevant reviews, comparisons, roundups, or buying guides.",
+        whyItMatters:
+          "Relevant affiliate internal links help readers compare related options without sending them to unrelated local pages."
+      })
+    );
+  }
+
+  if (!hasProductSchema && !hasReviewSchema && !hasItemListSchema && !hasFaqSchema) {
+    actions.push(
+      createAction({
+        impact: 6,
+        ease: 5,
+        action:
+          "Add Product, Review, ItemList, or FAQPage schema where appropriate.",
+        whyItMatters:
+          "Affiliate-friendly schema helps clarify products, reviews, lists, and FAQs without using local business markup."
+      })
+    );
+  } else if (countSchemaTypes(schemaSource) > 1) {
+    actions.push(
+      createAction({
+        impact: 3,
+        ease: 5,
+        action:
+          "Review affiliate schema blocks for consistency across Product, Review, ItemList, and FAQPage markup.",
+        whyItMatters:
+          "Consistent affiliate schema reduces conflicting product or review data."
+      })
+    );
+  }
+
+  actions.push(
+    createAction({
+      impact: 3,
+      ease: 5,
+      action:
+        "Affiliate scoring is in early support, so review recommendations against the actual business model before implementation.",
+      whyItMatters:
+        "The app now checks buyer-intent signals, but full Affiliate scoring is still being developed."
+    })
+  );
+
+  return actions
+    .filter(
+      (action, index, allActions) =>
+        allActions.findIndex((item) => item.action === action.action) === index
+    )
+    .sort((a, b) => b.estimatedScoreGain - a.estimatedScoreGain);
+}
+
 export function createPrioritizedActions(
   input: ScoringInput,
   signals: ExtractedSignals
@@ -499,6 +815,10 @@ export function createPrioritizedActions(
 
   if (intentMode === "blog-media") {
     return createBlogMediaPrioritizedActions(input, signals);
+  }
+
+  if (intentMode === "affiliate") {
+    return createAffiliatePrioritizedActions(input, signals);
   }
 
   const pageText = `${input.text ?? ""}\n${input.html ?? ""}`;

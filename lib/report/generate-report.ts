@@ -97,9 +97,15 @@ function getIntentModeLabel(mode?: IntentMode): string {
 }
 
 function getReportTitle(mode?: IntentMode): string {
-  return mode === "blog-media"
-    ? "BLOG / MEDIA DEVELOPER TASK SHEET"
-    : "LOCAL SEO DEVELOPER TASK SHEET";
+  if (mode === "blog-media") {
+    return "BLOG / MEDIA DEVELOPER TASK SHEET";
+  }
+
+  if (mode === "affiliate") {
+    return "AFFILIATE CONTENT DEVELOPER TASK SHEET";
+  }
+
+  return "LOCAL SEO DEVELOPER TASK SHEET";
 }
 
 function getIntentModeNotice(mode?: IntentMode): string {
@@ -256,6 +262,32 @@ const blogMediaInternalTopics = [
   "antivirus scans"
 ];
 
+const affiliateInternalTopics = [
+  "product review",
+  "product reviews",
+  "review",
+  "reviews",
+  "best",
+  "best-of",
+  "roundup",
+  "comparison",
+  "compare",
+  "vs",
+  "versus",
+  "buying guide",
+  "buyer guide",
+  "buyers guide",
+  "how-to buyer guide",
+  "alternatives",
+  "product",
+  "products",
+  "pricing",
+  "price",
+  "deal",
+  "discount",
+  "value"
+];
+
 function classifyInternalUrl(url: string): InternalLinkRecommendation["pageType"] {
   try {
     const parsedUrl = new URL(url);
@@ -300,7 +332,15 @@ function slugToWords(url: string): string {
 }
 
 function getInternalLinkTopics(mode?: IntentMode): string[] {
-  return mode === "blog-media" ? blogMediaInternalTopics : serviceTopics;
+  if (mode === "blog-media") {
+    return blogMediaInternalTopics;
+  }
+
+  if (mode === "affiliate") {
+    return affiliateInternalTopics;
+  }
+
+  return serviceTopics;
 }
 
 function extractDestinationTopics(
@@ -335,6 +375,7 @@ function getInternalLinkRecommendations(
   page: ReportPageDetails
 ): InternalLinkRecommendationGroups {
   const isBlogMedia = page.intentMode === "blog-media";
+  const isAffiliate = page.intentMode === "affiliate";
   const currentPageUrl = normalizeUrlForComparison(page.url);
   const recommendations = page.relatedInternalLinks
     .filter((link) => normalizeUrlForComparison(link.url) !== currentPageUrl)
@@ -383,6 +424,50 @@ function getInternalLinkRecommendations(
               : pageType === "service_page"
                 ? "Avoid service pages with weak editorial relevance."
                 : "No clear informational topic match.",
+          text: link.text,
+          topic: displayTopic,
+          url: link.url
+        };
+      }
+
+      if (isAffiliate) {
+        if (
+          destinationTopics.length > 0 &&
+          (pageType === "blog_post" || pageType === "other")
+        ) {
+          return {
+            confidence: "high",
+            pageType,
+            reason: `High confidence: affiliate buyer-intent content matches ${destinationTopics[0]}.`,
+            text: link.text,
+            topic: displayTopic,
+            url: link.url
+          };
+        }
+
+        if (destinationTopics.length > 0 && pageType === "service_page") {
+          return {
+            confidence: "medium",
+            pageType,
+            reason:
+              "Medium confidence: topical match, but confirm this is a review, comparison, roundup, or buying guide rather than a local service page.",
+            text: link.text,
+            topic: displayTopic,
+            url: link.url
+          };
+        }
+
+        return {
+          confidence: "medium",
+          pageType,
+          reason:
+            "Rejected: Affiliate mode should link to product reviews, best-of roundups, comparison articles, or buying guides.",
+          rejectedReason:
+            pageType === "location_page"
+              ? "Avoid location pages for Affiliate mode unless the page is genuinely a buyer guide with matching product intent."
+              : pageType === "service_page"
+                ? "Avoid local service pages with weak buyer-intent relevance."
+                : "No clear affiliate buyer-intent topic match.",
           text: link.text,
           topic: displayTopic,
           url: link.url
@@ -474,12 +559,18 @@ function hasRelevantEditorialInternalLinks(
 function formatInternalLinkRecommendations(page: ReportPageDetails): string {
   const recommendations = getInternalLinkRecommendations(page);
   const isBlogMedia = page.intentMode === "blog-media";
+  const isAffiliate = page.intentMode === "affiliate";
   const formatLink = (link: InternalLinkRecommendation) =>
     `- ${cleanReportText(link.text)} → ${link.url}\n  Reason: ${link.reason}`;
 
-  if (isBlogMedia && hasRelevantEditorialInternalLinks(recommendations)) {
+  if (
+    (isBlogMedia || isAffiliate) &&
+    hasRelevantEditorialInternalLinks(recommendations)
+  ) {
     return [
-      "Relevant editorial internal links already present.",
+      isAffiliate
+        ? "Relevant affiliate internal links already present."
+        : "Relevant editorial internal links already present.",
       "",
       "Detected relevant internal links",
       ...recommendations.highConfidence.map(formatLink),
@@ -509,6 +600,8 @@ function formatInternalLinkRecommendations(page: ReportPageDetails): string {
               `${formatLink(link)}\n  Warning: ${
                 isBlogMedia
                   ? "Medium confidence: useful topic match, but check it supports the article intent."
+                  : isAffiliate
+                    ? "Medium confidence: useful buyer-intent topic match, but check it is not an unrelated local page."
                   : "Medium confidence: not a dedicated service page."
               }`
           )
@@ -540,6 +633,8 @@ function formatInternalLinkRecommendations(page: ReportPageDetails): string {
       "No suitable link found",
       isBlogMedia
         ? "Do not force an internal link. Create or confirm a relevant guide, checklist, or supporting article first."
+        : isAffiliate
+          ? "Do not force an internal link. Create or confirm a relevant review, comparison, roundup, or buying guide first."
         : "Do not force an internal link. Create or confirm a dedicated page first.",
       "",
       "Rejected or risky links",
@@ -562,7 +657,7 @@ function formatInternalLinkRecommendations(page: ReportPageDetails): string {
 }
 
 function formatExistingEditorialInternalLinks(page: ReportPageDetails): string {
-  if (page.intentMode !== "blog-media") {
+  if (page.intentMode !== "blog-media" && page.intentMode !== "affiliate") {
     return "";
   }
 
@@ -577,7 +672,9 @@ function formatExistingEditorialInternalLinks(page: ReportPageDetails): string {
 
   return [
     "INTERNAL LINK STATUS",
-    "Relevant editorial internal links already present.",
+    page.intentMode === "affiliate"
+      ? "Relevant affiliate internal links already present."
+      : "Relevant editorial internal links already present.",
     "",
     "Detected relevant internal links",
     ...recommendations.highConfidence.map(formatLink),
@@ -639,6 +736,10 @@ function simplifyBenchmarkGap(gap: string): string {
     return "One competitor has deeper content";
   }
 
+  if (cleanGap.includes("buyer sections")) {
+    return "Fewer buyer sections than competitors";
+  }
+
   if (cleanGap.includes("more headings")) {
     return "Fewer service subheadings than competitors";
   }
@@ -657,6 +758,13 @@ function simplifyBenchmarkGap(gap: string): string {
     return `Missing ${trustSignal} (used by competitors)`;
   }
 
+  if (cleanGap.includes("buyer-intent coverage for")) {
+    const topicMatch = gap.match(/for (.*?) because/i);
+    const topic = topicMatch?.[1] ?? "buyer intent";
+
+    return `Missing ${topic} coverage`;
+  }
+
   if (cleanGap.includes("short section for")) {
     const topicMatch = gap.match(/for (.*?) because/i);
     const topic = topicMatch?.[1] ?? "service coverage";
@@ -667,7 +775,10 @@ function simplifyBenchmarkGap(gap: string): string {
   return gap;
 }
 
-function formatBenchmark(benchmark?: BenchmarkCompetitor[]): string {
+function formatBenchmark(
+  benchmark?: BenchmarkCompetitor[],
+  mode?: IntentMode
+): string {
   if (!benchmark || benchmark.length === 0) {
     return "No competitor benchmark has been added yet.";
   }
@@ -736,7 +847,13 @@ function formatBenchmark(benchmark?: BenchmarkCompetitor[]): string {
             ? competitor.trustSignals.map(cleanReportText).join(", ")
             : "None detected"
         }`,
-        `- Topics/services detected: ${
+        `- ${
+          mode === "affiliate"
+            ? "Products/buyer topics detected"
+            : mode === "blog-media"
+              ? "Topics/entities detected"
+              : "Topics/services detected"
+        }: ${
           competitor.topicsServices.length
             ? competitor.topicsServices.map(cleanReportText).join(", ")
             : "None detected"
@@ -756,6 +873,7 @@ function formatBenchmark(benchmark?: BenchmarkCompetitor[]): string {
 
 function formatBenchmarkActionGroups(insights: BenchmarkInsights): string {
   const isBlogMedia = insights.intentMode === "blog-media";
+  const isAffiliate = insights.intentMode === "affiliate";
   const groups: Array<{ title: string; items: string[] }> = [];
 
   if (insights.targetWordCount < insights.averageWordCount) {
@@ -766,6 +884,8 @@ function formatBenchmarkActionGroups(insights: BenchmarkInsights): string {
         `Competitor average: ${insights.averageWordCount} words`,
         isBlogMedia
           ? "Add more semantic depth, examples, and practical editorial detail"
+          : isAffiliate
+            ? "Add more buyer detail, comparison criteria, and product decision support"
           : "Add more service detail and local relevance"
       ]
     });
@@ -777,7 +897,11 @@ function formatBenchmarkActionGroups(insights: BenchmarkInsights): string {
       items: insights.priorityActionGroups.trustSignals
     },
     {
-      title: isBlogMedia ? "Expand topic coverage" : "Expand service coverage",
+      title: isBlogMedia
+        ? "Expand topic coverage"
+        : isAffiliate
+          ? "Expand buyer intent coverage"
+          : "Expand service coverage",
       items: insights.priorityActionGroups.serviceCoverage
     },
     {
@@ -801,6 +925,19 @@ function formatBenchmarkInsights(insights?: BenchmarkInsights | null): string {
     return "No combined competitor insights have been generated yet.";
   }
 
+  const isBlogMedia = insights.intentMode === "blog-media";
+  const isAffiliate = insights.intentMode === "affiliate";
+  const coverageLabel = isBlogMedia
+    ? "Topic coverage"
+    : isAffiliate
+      ? "Buyer intent coverage"
+      : "Service coverage";
+  const overlapLabel = isBlogMedia
+    ? "Topic/entity overlap:"
+    : isAffiliate
+      ? "Product/entity overlap:"
+      : "Topic/service overlap:";
+
   return [
     "Combined Competitor Insights",
     "",
@@ -813,7 +950,7 @@ function formatBenchmarkInsights(insights?: BenchmarkInsights | null): string {
     "Overall competitive position:",
     `- Content depth: ${cleanReportText(insights.overallPositionSections.contentDepth)}`,
     `- Trust signals: ${cleanReportText(insights.overallPositionSections.trustSignals)}`,
-    `- ${insights.intentMode === "blog-media" ? "Topic coverage" : "Service coverage"}: ${cleanReportText(insights.overallPositionSections.serviceCoverage)}`,
+    `- ${coverageLabel}: ${cleanReportText(insights.overallPositionSections.serviceCoverage)}`,
     `- Summary: ${cleanReportText(insights.overallPositionSections.summary)}`,
     "",
     "Majority signals:",
@@ -825,9 +962,7 @@ function formatBenchmarkInsights(insights?: BenchmarkInsights | null): string {
     "Content depth comparison:",
     `- ${cleanReportText(insights.contentDepthComparison)}`,
     "",
-    insights.intentMode === "blog-media"
-      ? "Topic/entity overlap:"
-      : "Topic/service overlap:",
+    overlapLabel,
     listItems(insights.topicServiceOverlap),
     "",
     "Trust signal presence:",
@@ -867,6 +1002,7 @@ function getDoNotChangeItems(
   mode?: IntentMode
 ): string[] {
   const isBlogMedia = mode === "blog-media";
+  const isAffiliate = mode === "affiliate";
   const items: string[] = [];
 
   if (
@@ -885,11 +1021,16 @@ function getDoNotChangeItems(
     items.push(
       isBlogMedia
         ? "Existing article sections/headings are useful. Improve them rather than replacing them."
+        : isAffiliate
+          ? "Existing buyer sections/headings are useful. Improve them rather than replacing them."
         : "Existing service sections/headings are useful. Improve them rather than replacing them."
     );
   }
 
-  if (result.signals.hasPhoneNumber || result.signals.ctaWords.length > 0) {
+  if (
+    !isAffiliate &&
+    (result.signals.hasPhoneNumber || result.signals.ctaWords.length > 0)
+  ) {
     items.push(
       "Phone number and/or call-to-action placement is already detected."
     );
@@ -897,13 +1038,17 @@ function getDoNotChangeItems(
 
   if (result.signals.trustSignals.length > 0) {
     items.push(
-      `Existing review/trust content is useful: ${result.signals.trustSignals.join(", ")}.`
+      isAffiliate
+        ? `Existing affiliate trust signals are useful: ${result.signals.trustSignals.join(", ")}.`
+        : `Existing review/trust content is useful: ${result.signals.trustSignals.join(", ")}.`
     );
   }
 
   if (items.length === 0) {
     items.push(
-      "Keep any accurate business details, service copy, phone numbers, and existing trust content that are already on the page."
+      isAffiliate
+        ? "Keep any accurate product details, affiliate disclosure, reviewer notes, and buyer guidance that are already on the page."
+        : "Keep any accurate business details, service copy, phone numbers, and existing trust content that are already on the page."
     );
   }
 
@@ -969,21 +1114,85 @@ function getTaskDetails(
 
   if (cleanAction.includes("internal links")) {
     const isBlogMedia = page.intentMode === "blog-media";
+    const isAffiliate = page.intentMode === "affiliate";
 
     return {
       whereToImplement:
         isBlogMedia
           ? "Inside relevant article sections in the main page content."
+          : isAffiliate
+            ? "Inside relevant buyer sections in the main page content."
           : "Inside relevant service sections in the main page content.",
       whatToChange:
         isBlogMedia
           ? "Add only contextually relevant internal links to supporting articles, guides, checklists, or explainers where the topic matches the article section."
+          : isAffiliate
+            ? "Add only contextually relevant internal links to product reviews, best-of roundups, comparison articles, or buying guides where the topic matches the buyer section."
           : "Add only contextually relevant internal links where the anchor topic matches the destination topic.",
       example: formatInternalLinkRecommendations(page),
       expectedOutcome:
         isBlogMedia
           ? "Readers and search engines can move more easily between related editorial topic-cluster content."
+          : isAffiliate
+            ? "Readers and search engines can move more easily between related buyer-intent reviews, comparisons, and guides."
           : "Visitors and search engines can move more easily between related service pages."
+    };
+  }
+
+  if (
+    page.intentMode === "affiliate" &&
+    (cleanAction.includes("comparison table") ||
+      cleanAction.includes("pros and cons") ||
+      cleanAction.includes("best for") ||
+      cleanAction.includes("buyer guide"))
+  ) {
+    return {
+      whereToImplement:
+        "Inside the main buyer-intent content, near the product recommendations or comparison section.",
+      whatToChange:
+        "Add clear buyer sections that help readers compare products, understand trade-offs, and choose the right option.",
+      example:
+        "Example buyer section labels: Comparison table, Pros and cons, Best for budget buyers, Best for heavy users, How to choose.",
+      expectedOutcome:
+        "The page gives clearer buyer guidance without adding local service or location-page recommendations."
+    };
+  }
+
+  if (
+    page.intentMode === "affiliate" &&
+    (cleanAction.includes("affiliate disclosure") ||
+      cleanAction.includes("author") ||
+      cleanAction.includes("reviewer") ||
+      cleanAction.includes("testing notes"))
+  ) {
+    return {
+      whereToImplement:
+        "Near the top of the article for disclosure, and near the byline or review sections for expertise/testing notes.",
+      whatToChange:
+        "Add only accurate affiliate trust wording. Do not invent testing, credentials, commissions, or review claims.",
+      example:
+        "Example disclosure: This page may contain affiliate links. If you buy through these links, we may earn a commission at no extra cost to you.",
+      expectedOutcome:
+        "Readers can understand how the page is monetised and why the recommendations are trustworthy."
+    };
+  }
+
+  if (
+    page.intentMode === "affiliate" &&
+    (cleanAction.includes("product, review") ||
+      cleanAction.includes("itemlist") ||
+      cleanAction.includes("product schema") ||
+      cleanAction.includes("review schema"))
+  ) {
+    return {
+      whereToImplement:
+        "SEO plugin custom schema field, page head, or page-level JSON-LD injection area.",
+      whatToChange:
+        "Add Product, Review, ItemList, or FAQPage schema only where it matches visible product, review, list, or FAQ content.",
+      example:
+        "Use Product schema for a single reviewed product, Review schema for real review content, ItemList schema for ranked roundups, and FAQPage schema only for visible FAQs.",
+      expectedOutcome:
+        "Structured data supports affiliate buyer content without using LocalBusiness or location schema."
     };
   }
 
@@ -1169,7 +1378,7 @@ export function generateDeveloperReport({
     "COMPETITOR BENCHMARK",
     formatBenchmarkInsights(benchmarkInsights),
     "",
-    formatBenchmark(benchmark),
+    formatBenchmark(benchmark, page.intentMode),
     "",
     "TASKS FOR DEVELOPER",
     formatTasks(result.prioritizedActions, "high", page),

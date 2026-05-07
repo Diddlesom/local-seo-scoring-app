@@ -393,6 +393,127 @@ function findBlogMediaTopicSignals(
   return Array.from(signals);
 }
 
+function findAffiliateTrustSignals(
+  text: string,
+  headings: ExtractedSignals["headings"]
+): string[] {
+  const signals = new Set<string>();
+  const allContent = `${text} ${headings.h1.join(" ")} ${headings.h2.join(" ")} ${headings.h3.join(" ")}`;
+
+  if (
+    /\b(?:affiliate disclosure|affiliate links?|commission|we may earn|reader-supported|paid link|sponsored)\b/i.test(
+      allContent
+    )
+  ) {
+    signals.add("Affiliate disclosure");
+  }
+
+  if (
+    /\b(?:by|author|written by|reviewed by|edited by)\s+[A-Z][a-z]+/i.test(
+      allContent
+    ) ||
+    /\b(?:reviewer|expert|specialist|editor|credentials?|bio|tested by)\b/i.test(
+      allContent
+    )
+  ) {
+    signals.add("Author/reviewer expertise");
+  }
+
+  if (
+    /\b(?:i|we|our team)\s+(?:tested|tried|used|compared|reviewed|measured|benchmarked)\b/i.test(
+      allContent
+    ) ||
+    /\b(?:hands-on|first-hand|in our testing|during testing|real-world testing|lab test|review unit)\b/i.test(
+      allContent
+    )
+  ) {
+    signals.add("First-hand testing/review wording");
+  }
+
+  if (
+    /\b(?:published|updated|last updated|reviewed|checked)\b/i.test(
+      allContent
+    ) ||
+    /\b(?:20[2-9]\d|jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\b/i.test(
+      allContent
+    )
+  ) {
+    signals.add("Freshness/date signals");
+  }
+
+  if (
+    /\b(?:faq|frequently asked questions|questions and answers)\b/i.test(
+      allContent
+    ) ||
+    [...headings.h2, ...headings.h3].some((heading) => /\?/.test(heading))
+  ) {
+    signals.add("FAQs");
+  }
+
+  if (/href=["'][^"']+/i.test(allContent)) {
+    signals.add("Internal links to reviews/comparisons/guides");
+  }
+
+  return Array.from(signals);
+}
+
+function findAffiliateTopicSignals(
+  text: string,
+  headings: ExtractedSignals["headings"]
+): string[] {
+  const signals = new Set<string>();
+  const allHeadings = [...headings.h1, ...headings.h2, ...headings.h3].join(" ");
+  const allContent = `${text} ${allHeadings}`;
+
+  if (
+    /\b(?:product|products|model|models|brand|brands|device|devices|software|tool|tools|platform|platforms)\b/i.test(
+      allContent
+    ) ||
+    /\b[A-Z][A-Za-z0-9]+(?:\s+[A-Z][A-Za-z0-9]+){1,3}\b/.test(allContent)
+  ) {
+    signals.add("Product names/entities");
+  }
+
+  if (
+    /\b(?:category|categories|type|types|budget|premium|entry-level|mid-range|professional|consumer|business)\b/i.test(
+      allContent
+    )
+  ) {
+    signals.add("Product categories");
+  }
+
+  if (
+    /<table[\s>]/i.test(text) ||
+    /\b(?:comparison table|compare|compared|versus| vs\.? |side-by-side)\b/i.test(
+      allContent
+    )
+  ) {
+    signals.add("Comparison tables/criteria");
+  }
+
+  if (/\b(?:pros?|cons?|advantages?|disadvantages?|drawbacks?)\b/i.test(allContent)) {
+    signals.add("Pros and cons");
+  }
+
+  if (/\b(?:best for|best overall|best budget|best value|best premium|best for beginners|best choice)\b/i.test(allContent)) {
+    signals.add("Best-for sections");
+  }
+
+  if (/\b(?:buying guide|buyer guide|buyers guide|how to choose|what to look for|before you buy)\b/i.test(allContent)) {
+    signals.add("Buyer guide sections");
+  }
+
+  if (/\b(?:price|pricing|cost|value|cheap|budget|deal|discount|save|worth it|money)\b/i.test(allContent)) {
+    signals.add("Pricing/value language");
+  }
+
+  if (/\b(?:alternative|alternatives|competitor|comparison|compare|versus| vs\.? )\b/i.test(allContent)) {
+    signals.add("Alternatives/comparisons");
+  }
+
+  return Array.from(signals);
+}
+
 function findSchemaTypes(schemaSource: string): string[] {
   return scoringConfig.schemaTypes.filter((type) =>
     new RegExp(`"@type"\\s*:\\s*"[^"]*${type}[^"]*"`, "i").test(
@@ -412,11 +533,15 @@ export function extractSignals(input: ScoringInput): ExtractedSignals {
   const trustSignals =
     intentMode === "blog-media"
       ? findBlogMediaTrustSignals(`${pageText}\n${html}`, headings)
-      : findTrustSignals(pageText);
+      : intentMode === "affiliate"
+        ? findAffiliateTrustSignals(`${pageText}\n${html}`, headings)
+        : findTrustSignals(pageText);
   const topicSignals =
     intentMode === "blog-media"
       ? findBlogMediaTopicSignals(pageText, headings)
-      : [];
+      : intentMode === "affiliate"
+        ? findAffiliateTopicSignals(`${pageText}\n${html}`, headings)
+        : [];
   const ctaWords = findMatches(pageText, scoringConfig.ctaWords);
   const schemaTypes = findSchemaTypes(schemaSource);
   const locationMentionCount = countPhrase(pageText, input.location);
@@ -443,12 +568,16 @@ export function extractSignals(input: ScoringInput): ExtractedSignals {
       ? `Trust signals: ${trustSignals.join(", ")}`
       : intentMode === "blog-media"
         ? "No Blog/Media trust signals detected"
-        : "No basic trust signals detected",
-    ...(intentMode === "blog-media"
+        : intentMode === "affiliate"
+          ? "No Affiliate trust signals detected"
+          : "No basic trust signals detected",
+    ...(intentMode === "blog-media" || intentMode === "affiliate"
       ? [
           topicSignals.length > 0
             ? `Topic signals: ${topicSignals.join(", ")}`
-            : "No Blog/Media topic signals detected"
+            : intentMode === "affiliate"
+              ? "No Affiliate buyer-intent topic signals detected"
+              : "No Blog/Media topic signals detected"
         ]
       : []),
     ctaWords.length > 0
