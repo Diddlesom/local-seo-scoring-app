@@ -230,19 +230,148 @@ const intentTopicKeywords: Record<IntentMode, string[]> = {
     "onboarding",
     "support"
   ],
-  "blog-media": [
-    "guide",
-    "how to",
-    "tips",
-    "news",
-    "analysis",
-    "resources",
-    "newsletter",
-    "related articles",
-    "editorial",
-    "explainer"
-  ]
+  "blog-media": []
 };
+
+const blogMediaTopicPatterns: Array<{ label: string; patterns: RegExp[] }> = [
+  {
+    label: "startup programs",
+    patterns: [
+      /\bstartup (?:app|apps|program|programs|item|items)\b/i,
+      /\bprograms? (?:that )?(?:run|runs|running|start|starts) (?:at|on) startup\b/i,
+      /\bstartup folder\b/i
+    ]
+  },
+  {
+    label: "malware",
+    patterns: [
+      /\bmalware\b/i,
+      /\bspyware\b/i,
+      /\badware\b/i,
+      /\bvirus(?:es)?\b/i,
+      /\binfected\b/i
+    ]
+  },
+  {
+    label: "SSD upgrades",
+    patterns: [
+      /\bssd(?:s)?\b/i,
+      /\bsolid state drive\b/i,
+      /\bdrive upgrade\b/i,
+      /\bupgrade (?:to )?(?:an? )?ssd\b/i
+    ]
+  },
+  {
+    label: "RAM usage",
+    patterns: [
+      /\bram\b/i,
+      /\bmemory usage\b/i,
+      /\bhigh memory\b/i,
+      /\bavailable memory\b/i
+    ]
+  },
+  {
+    label: "overheating",
+    patterns: [
+      /\boverheat(?:ing)?\b/i,
+      /\brunning hot\b/i,
+      /\bfan noise\b/i,
+      /\bcooling\b/i,
+      /\bthermal\b/i
+    ]
+  },
+  {
+    label: "browser tabs",
+    patterns: [
+      /\bbrowser tabs?\b/i,
+      /\btoo many tabs?\b/i,
+      /\bchrome tabs?\b/i,
+      /\bedge tabs?\b/i
+    ]
+  },
+  {
+    label: "Windows updates",
+    patterns: [
+      /\bwindows updates?\b/i,
+      /\bwindows update\b/i,
+      /\bupdate history\b/i,
+      /\bpending updates?\b/i
+    ]
+  },
+  {
+    label: "slow boot times",
+    patterns: [
+      /\bslow boot(?: time| times)?\b/i,
+      /\bslow startup\b/i,
+      /\btakes? (?:too )?long to (?:boot|start)\b/i,
+      /\bboot time\b/i
+    ]
+  },
+  {
+    label: "hard drive failure",
+    patterns: [
+      /\bhard drive failure\b/i,
+      /\bfailing (?:hard )?drive\b/i,
+      /\bdisk failure\b/i,
+      /\bbad sectors?\b/i,
+      /\bclicking drive\b/i
+    ]
+  },
+  {
+    label: "antivirus scans",
+    patterns: [
+      /\bantivirus scan(?:s)?\b/i,
+      /\bvirus scan(?:s)?\b/i,
+      /\bsecurity scan(?:s)?\b/i,
+      /\bdefender scan(?:s)?\b/i
+    ]
+  },
+  {
+    label: "background processes",
+    patterns: [
+      /\bbackground (?:app|apps|process|processes|tasks?)\b/i,
+      /\btask manager\b/i,
+      /\bhigh cpu\b/i,
+      /\bcpu usage\b/i
+    ]
+  },
+  {
+    label: "disk space",
+    patterns: [
+      /\bdisk space\b/i,
+      /\blow storage\b/i,
+      /\bstorage full\b/i,
+      /\bfree up space\b/i
+    ]
+  },
+  {
+    label: "temporary files",
+    patterns: [
+      /\btemporary files?\b/i,
+      /\btemp files?\b/i,
+      /\bdisk cleanup\b/i,
+      /\bcache files?\b/i
+    ]
+  },
+  {
+    label: "driver issues",
+    patterns: [
+      /\bdrivers?\b/i,
+      /\bdevice manager\b/i,
+      /\boutdated driver\b/i,
+      /\bdriver update\b/i
+    ]
+  },
+  {
+    label: "hardware diagnostics",
+    patterns: [
+      /\bhardware diagnostics?\b/i,
+      /\bdiagnostic test(?:s)?\b/i,
+      /\bhealth check\b/i,
+      /\bsystem check\b/i
+    ]
+  }
+];
 
 const executionModes: Array<{
   description: string;
@@ -308,6 +437,12 @@ function detectTopicsServices(
   text: string,
   intentMode: IntentMode = "local-seo"
 ): string[] {
+  if (intentMode === "blog-media") {
+    return blogMediaTopicPatterns
+      .filter((topic) => topic.patterns.some((pattern) => pattern.test(text)))
+      .map((topic) => topic.label);
+  }
+
   const cleanText = text.toLowerCase();
   const keywords = intentTopicKeywords[intentMode] ?? localTopicKeywords;
 
