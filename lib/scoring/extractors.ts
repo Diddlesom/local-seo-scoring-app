@@ -514,6 +514,127 @@ function findAffiliateTopicSignals(
   return Array.from(signals);
 }
 
+function findSaasTrustSignals(
+  text: string,
+  headings: ExtractedSignals["headings"]
+): string[] {
+  const signals = new Set<string>();
+  const allContent = `${text} ${headings.h1.join(" ")} ${headings.h2.join(" ")} ${headings.h3.join(" ")}`;
+
+  if (
+    /\b(?:testimonial|case stud(?:y|ies)|customer story|customer stories|trusted by|customers include)\b/i.test(
+      allContent
+    )
+  ) {
+    signals.add("Testimonials/case studies");
+  }
+
+  if (
+    /\b(?:security|secure|soc\s?2|iso\s?27001|gdpr|hipaa|compliance|sso|encryption|permissions|data protection)\b/i.test(
+      allContent
+    )
+  ) {
+    signals.add("Security/compliance trust signals");
+  }
+
+  if (
+    /\b(?:docs|documentation|help center|help centre|support|knowledge base|developer docs|api docs)\b/i.test(
+      allContent
+    )
+  ) {
+    signals.add("Support/help documentation links");
+  }
+
+  if (
+    /\b(?:faq|frequently asked questions|questions and answers)\b/i.test(
+      allContent
+    ) ||
+    [...headings.h2, ...headings.h3].some((heading) => /\?/.test(heading))
+  ) {
+    signals.add("FAQs");
+  }
+
+  if (
+    /\b(?:by|author|written by|reviewed by|edited by)\s+[A-Z][a-z]+/i.test(
+      allContent
+    ) ||
+    /\b(?:company|team|founder|expert|specialist|product team|editorial team)\b/i.test(
+      allContent
+    )
+  ) {
+    signals.add("Author/company expertise");
+  }
+
+  if (
+    /\b(?:published|updated|last updated|reviewed|checked)\b/i.test(
+      allContent
+    ) ||
+    /\b(?:20[2-9]\d|jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\b/i.test(
+      allContent
+    )
+  ) {
+    signals.add("Freshness/date signals");
+  }
+
+  return Array.from(signals);
+}
+
+function findSaasTopicSignals(
+  text: string,
+  headings: ExtractedSignals["headings"]
+): string[] {
+  const signals = new Set<string>();
+  const allHeadings = [...headings.h1, ...headings.h2, ...headings.h3].join(" ");
+  const allContent = `${text} ${allHeadings}`;
+
+  if (
+    /\b(?:software|platform|app|application|tool|suite|dashboard|workspace|crm|automation|analytics|product)\b/i.test(
+      allContent
+    ) ||
+    /\b[A-Z][A-Za-z0-9]+(?:\s+[A-Z][A-Za-z0-9]+){1,3}\b/.test(allContent)
+  ) {
+    signals.add("Product name/entities");
+  }
+
+  if (/\b(?:crm|cms|erp|project management|analytics|automation|helpdesk|email marketing|seo|accounting|hr|sales|support|category)\b/i.test(allContent)) {
+    signals.add("Product category");
+  }
+
+  if (/\b(?:feature|features|capability|capabilities|workflow|automation|dashboard|reporting|collaboration|api)\b/i.test(allContent)) {
+    signals.add("Features");
+  }
+
+  if (/\b(?:benefit|benefits|save time|reduce|increase|improve|faster|easier|roi|productivity|efficiency)\b/i.test(allContent)) {
+    signals.add("Benefits");
+  }
+
+  if (/\b(?:use case|use cases|for teams|for agencies|for startups|for enterprise|persona|personas|industry|industries)\b/i.test(allContent)) {
+    signals.add("Use cases/personas");
+  }
+
+  if (/\b(?:integration|integrations|connects with|works with|zapier|slack|salesforce|hubspot|google|microsoft)\b/i.test(allContent)) {
+    signals.add("Integrations");
+  }
+
+  if (/\b(?:pricing|price|free trial|trial|demo|book a demo|sign up|signup|contact sales|plan|plans)\b/i.test(allContent)) {
+    signals.add("Pricing/free trial/demo language");
+  }
+
+  if (/\b(?:alternative|alternatives|comparison|compare|versus| vs\.? |competitor|competitors)\b/i.test(allContent)) {
+    signals.add("Comparison/alternatives content");
+  }
+
+  if (/\b(?:onboarding|setup|implementation|getting started|migration|install|configuration)\b/i.test(allContent)) {
+    signals.add("Onboarding/setup content");
+  }
+
+  if (/<img\b|<video\b|\b(?:screenshot|screenshots|product tour|demo video|walkthrough|interface|ui)\b/i.test(allContent)) {
+    signals.add("Screenshots/product visuals");
+  }
+
+  return Array.from(signals);
+}
+
 function findSchemaTypes(schemaSource: string): string[] {
   return scoringConfig.schemaTypes.filter((type) =>
     new RegExp(`"@type"\\s*:\\s*"[^"]*${type}[^"]*"`, "i").test(
@@ -535,14 +656,32 @@ export function extractSignals(input: ScoringInput): ExtractedSignals {
       ? findBlogMediaTrustSignals(`${pageText}\n${html}`, headings)
       : intentMode === "affiliate"
         ? findAffiliateTrustSignals(`${pageText}\n${html}`, headings)
+        : intentMode === "saas"
+          ? findSaasTrustSignals(`${pageText}\n${html}`, headings)
         : findTrustSignals(pageText);
   const topicSignals =
     intentMode === "blog-media"
       ? findBlogMediaTopicSignals(pageText, headings)
       : intentMode === "affiliate"
         ? findAffiliateTopicSignals(`${pageText}\n${html}`, headings)
+        : intentMode === "saas"
+          ? findSaasTopicSignals(`${pageText}\n${html}`, headings)
         : [];
-  const ctaWords = findMatches(pageText, scoringConfig.ctaWords);
+  const ctaWords = findMatches(
+    pageText,
+    intentMode === "saas"
+      ? [
+          ...scoringConfig.ctaWords,
+          "demo",
+          "free trial",
+          "trial",
+          "sign up",
+          "signup",
+          "get started",
+          "contact sales"
+        ]
+      : scoringConfig.ctaWords
+  );
   const schemaTypes = findSchemaTypes(schemaSource);
   const locationMentionCount = countPhrase(pageText, input.location);
   const hasPhoneNumber = findPhoneNumber(pageText);
@@ -570,14 +709,18 @@ export function extractSignals(input: ScoringInput): ExtractedSignals {
         ? "No Blog/Media trust signals detected"
         : intentMode === "affiliate"
           ? "No Affiliate trust signals detected"
+          : intentMode === "saas"
+            ? "No SaaS trust signals detected"
           : "No basic trust signals detected",
-    ...(intentMode === "blog-media" || intentMode === "affiliate"
+    ...(intentMode === "blog-media" || intentMode === "affiliate" || intentMode === "saas"
       ? [
           topicSignals.length > 0
             ? `Topic signals: ${topicSignals.join(", ")}`
             : intentMode === "affiliate"
               ? "No Affiliate buyer-intent topic signals detected"
-              : "No Blog/Media topic signals detected"
+              : intentMode === "saas"
+                ? "No SaaS product/use-case topic signals detected"
+                : "No Blog/Media topic signals detected"
         ]
       : []),
     ctaWords.length > 0

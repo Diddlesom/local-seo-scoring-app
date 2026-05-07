@@ -18,6 +18,9 @@ export const scoringConfig = {
     "Product",
     "Review",
     "ItemList",
-    "Article"
+    "Article",
+    "SoftwareApplication",
+    "Organization",
+    "BreadcrumbList"
   ]
 } as const;

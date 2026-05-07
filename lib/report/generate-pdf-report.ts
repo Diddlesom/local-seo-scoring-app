@@ -222,6 +222,8 @@ export async function generatePdfReport({ page, result }: PdfReportInput) {
         ? "Topic coverage"
         : intentMode === "affiliate" && category === "localSignals"
           ? "Buyer intent coverage"
+          : intentMode === "saas" && category === "localSignals"
+            ? "Product/use-case coverage"
         : categoryLabels[category];
     const maxScore = scoringConfig.categoryWeights[category];
     const barWidth = 220;

@@ -111,6 +111,38 @@ function createAffiliateCategoryScores(
   };
 }
 
+function createSaasCategoryScores(
+  signals: ReturnType<typeof extractSignals>
+): CategoryScores {
+  const saasSchemaTypes = signals.schemaTypes.filter((type) =>
+    [
+      "SoftwareApplication",
+      "Product",
+      "Organization",
+      "BreadcrumbList",
+      "FAQPage"
+    ].includes(type)
+  );
+
+  return {
+    content: signals.wordCount >= 900 ? 15 : signals.wordCount >= 500 ? 10 : 5,
+    headings:
+      signals.headings.h1.length > 0 &&
+      signals.headings.h2.length + signals.headings.h3.length >= 4
+        ? 15
+        : signals.headings.h1.length > 0
+          ? 10
+          : 0,
+    metadata:
+      (signals.titleKeywordMatch ? 10 : 0) +
+      (signals.metaDescriptionKeywordMatch ? 10 : 0),
+    localSignals: Math.min(signals.topicSignals.length * 3, 15),
+    trust: Math.min(signals.trustSignals.length * 2, 10),
+    conversion: Math.min(signals.ctaWords.length * 3, 10),
+    schema: Math.min(saasSchemaTypes.length * 5, 15)
+  };
+}
+
 function createStrengths(
   signals: ReturnType<typeof extractSignals>,
   categoryScores: CategoryScores,
@@ -164,6 +196,30 @@ function createStrengths(
       strengths.push(
         `Page includes affiliate trust signals: ${signals.trustSignals.join(", ")}.`
       );
+    }
+
+    if (signals.schemaTypes.length > 0) {
+      strengths.push("Page includes supported schema markup.");
+    }
+
+    return strengths;
+  }
+
+  if (intentMode === "saas") {
+    if (signals.topicSignals.length > 0) {
+      strengths.push(
+        `Page includes SaaS product/use-case signals: ${signals.topicSignals.join(", ")}.`
+      );
+    }
+
+    if (signals.trustSignals.length > 0) {
+      strengths.push(
+        `Page includes SaaS trust signals: ${signals.trustSignals.join(", ")}.`
+      );
+    }
+
+    if (signals.ctaWords.length > 0) {
+      strengths.push("Page includes product-led conversion wording.");
     }
 
     if (signals.schemaTypes.length > 0) {
@@ -276,6 +332,40 @@ function createWeaknesses(
     return weaknesses;
   }
 
+  if (intentMode === "saas") {
+    if (signals.topicSignals.length < 4) {
+      weaknesses.push(
+        "SaaS product/use-case coverage is light."
+      );
+    }
+
+    if (signals.trustSignals.length < 3) {
+      weaknesses.push(
+        "SaaS trust signals are limited."
+      );
+    }
+
+    if (signals.ctaWords.length === 0) {
+      weaknesses.push("No clear demo, free trial, signup, or sales CTA was found.");
+    }
+
+    if (
+      !signals.schemaTypes.some((type) =>
+        [
+          "SoftwareApplication",
+          "Product",
+          "Organization",
+          "BreadcrumbList",
+          "FAQPage"
+        ].includes(type)
+      )
+    ) {
+      weaknesses.push("No SaaS-supported schema markup was found.");
+    }
+
+    return weaknesses;
+  }
+
   if (!signals.metaDescriptionLocationMatch) {
     weaknesses.push("Meta description does not include the target location.");
   }
@@ -313,6 +403,8 @@ export function scoreLocalSeo(input: ScoringInput): ScoreResult {
       ? createBlogMediaCategoryScores(signals)
       : intentMode === "affiliate"
         ? createAffiliateCategoryScores(signals)
+        : intentMode === "saas"
+          ? createSaasCategoryScores(signals)
       : createCategoryScores(signals);
   const totalScore = Object.values(categoryScores).reduce(
     (total, score) => total + score,

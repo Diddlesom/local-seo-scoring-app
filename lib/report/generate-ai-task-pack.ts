@@ -49,6 +49,10 @@ function getTaskPackTitle(mode?: IntentMode): string {
     return "AFFILIATE CONTENT AI TASK PACK";
   }
 
+  if (mode === "saas") {
+    return "SAAS CONTENT AI TASK PACK";
+  }
+
   return "LOCAL SEO AI TASK PACK";
 }
 
@@ -255,6 +259,34 @@ const affiliateInternalTopics = [
   "value"
 ];
 
+const saasInternalTopics = [
+  "feature",
+  "features",
+  "use case",
+  "use-case",
+  "use cases",
+  "pricing",
+  "demo",
+  "free trial",
+  "trial",
+  "signup",
+  "sign-up",
+  "integrations",
+  "integration",
+  "docs",
+  "documentation",
+  "help center",
+  "help centre",
+  "support",
+  "comparison",
+  "compare",
+  "alternatives",
+  "security",
+  "api",
+  "customers",
+  "case study"
+];
+
 function classifyInternalUrl(url: string): InternalLinkRecommendation["pageType"] {
   try {
     const parsedUrl = new URL(url);
@@ -307,6 +339,10 @@ function getInternalLinkTopics(mode?: IntentMode): string[] {
     return affiliateInternalTopics;
   }
 
+  if (mode === "saas") {
+    return saasInternalTopics;
+  }
+
   return serviceTopics;
 }
 
@@ -343,6 +379,7 @@ function getInternalLinkRecommendations(
 ): InternalLinkRecommendationGroups {
   const isBlogMedia = page.intentMode === "blog-media";
   const isAffiliate = page.intentMode === "affiliate";
+  const isSaas = page.intentMode === "saas";
   const currentPageUrl = normalizeUrlForComparison(page.url);
   const recommendations = page.relatedInternalLinks
     .filter((link) => normalizeUrlForComparison(link.url) !== currentPageUrl)
@@ -440,6 +477,37 @@ function getInternalLinkRecommendations(
         };
       }
 
+      if (isSaas) {
+        if (
+          destinationTopics.length > 0 &&
+          pageType !== "location_page" &&
+          pageType !== "contact_page"
+        ) {
+          return {
+            confidence: "high",
+            pageType,
+            reason: `High confidence: SaaS product/use-case content matches ${destinationTopics[0]}.`,
+            text: link.text,
+            topic: displayTopic,
+            url: link.url
+          };
+        }
+
+        return {
+          confidence: "medium",
+          pageType,
+          reason:
+            "Rejected: SaaS mode should link to features, use cases, pricing, integrations, docs, comparisons, alternatives, demo, trial, or signup pages.",
+          rejectedReason:
+            pageType === "location_page"
+              ? "Avoid location pages for SaaS mode unless the page genuinely supports the product/use-case topic."
+              : "No clear SaaS product/use-case topic match.",
+          text: link.text,
+          topic: displayTopic,
+          url: link.url
+        };
+      }
+
       if (
         anchorTopics.length > 0 &&
         pageType === "service_page" &&
@@ -526,16 +594,19 @@ function formatInternalLinkRecommendations(page: ReportPageDetails): string {
   const recommendations = getInternalLinkRecommendations(page);
   const isBlogMedia = page.intentMode === "blog-media";
   const isAffiliate = page.intentMode === "affiliate";
+  const isSaas = page.intentMode === "saas";
   const formatLink = (link: InternalLinkRecommendation) =>
     `- ${cleanText(link.text)} → ${link.url}\n  Reason: ${link.reason}`;
 
   if (
-    (isBlogMedia || isAffiliate) &&
+    (isBlogMedia || isAffiliate || isSaas) &&
     hasRelevantEditorialInternalLinks(recommendations)
   ) {
     return [
       isAffiliate
         ? "Relevant affiliate internal links already present."
+        : isSaas
+          ? "Relevant SaaS internal links already present."
         : "Relevant editorial internal links already present.",
       "",
       "Detected relevant internal links",
@@ -568,6 +639,8 @@ function formatInternalLinkRecommendations(page: ReportPageDetails): string {
                   ? "Medium confidence: useful topic match, but check it supports the article intent."
                   : isAffiliate
                     ? "Medium confidence: useful buyer-intent topic match, but check it is not an unrelated local page."
+                    : isSaas
+                      ? "Medium confidence: useful product/use-case topic match, but check it supports the SaaS evaluation journey."
                   : "Medium confidence: not a dedicated service page."
               }`
           )
@@ -601,6 +674,8 @@ function formatInternalLinkRecommendations(page: ReportPageDetails): string {
         ? "Do not force an internal link. Create or confirm a relevant guide, checklist, or supporting article first."
         : isAffiliate
           ? "Do not force an internal link. Create or confirm a relevant review, comparison, roundup, or buying guide first."
+          : isSaas
+            ? "Do not force an internal link. Create or confirm a real feature, pricing, integration, docs, comparison, alternatives, demo, trial, signup, or use-case page first."
         : "Do not force an internal link. Create or confirm a dedicated page first.",
       "",
       "Rejected or risky links",
@@ -623,7 +698,11 @@ function formatInternalLinkRecommendations(page: ReportPageDetails): string {
 }
 
 function formatExistingEditorialInternalLinks(page: ReportPageDetails): string {
-  if (page.intentMode !== "blog-media" && page.intentMode !== "affiliate") {
+  if (
+    page.intentMode !== "blog-media" &&
+    page.intentMode !== "affiliate" &&
+    page.intentMode !== "saas"
+  ) {
     return "";
   }
 
@@ -640,6 +719,8 @@ function formatExistingEditorialInternalLinks(page: ReportPageDetails): string {
     "INTERNAL LINK STATUS",
     page.intentMode === "affiliate"
       ? "Relevant affiliate internal links already present."
+      : page.intentMode === "saas"
+        ? "Relevant SaaS internal links already present."
       : "Relevant editorial internal links already present.",
     "",
     "Detected relevant internal links",
@@ -738,6 +819,8 @@ function getWhereToImplement(action: PrioritizedAction, page: ReportPageDetails)
       ? "Only edit the relevant article sections in the current page content."
       : page.intentMode === "affiliate"
         ? "Only edit the relevant buyer sections in the current page content."
+        : page.intentMode === "saas"
+          ? "Only edit the relevant product sections in the current page content."
       : "Only edit the relevant service sections in the current page content.";
   }
 
@@ -775,12 +858,98 @@ function getCodeOrContent(action: PrioritizedAction, page: ReportPageDetails): s
     ].join("\n");
   }
 
+  if (page.intentMode === "saas" && cleanAction.includes("page title")) {
+    return [
+      "Use a product-led title that includes the target keyword and the SaaS product/use-case promise.",
+      "",
+      `Example title: ${targetKeyword} Software for Growing Teams`
+    ].join("\n");
+  }
+
+  if (
+    page.intentMode === "affiliate" &&
+    (cleanAction.includes("product, review") ||
+      cleanAction.includes("itemlist") ||
+      cleanAction.includes("product schema") ||
+      cleanAction.includes("review schema"))
+  ) {
+    return [
+      "Add Product, Review, or ItemList schema where appropriate. Only add FAQPage schema if visible FAQs are added first.",
+      "- Product: for a single reviewed product.",
+      "- Review: for real review content.",
+      "- ItemList: for ranked roundups.",
+      "- FAQPage: only when visible FAQ questions and answers exist on the page."
+    ].join("\n");
+  }
+
+  if (
+    page.intentMode === "saas" &&
+    (cleanAction.includes("softwareapplication") ||
+      cleanAction.includes("organization") ||
+      cleanAction.includes("breadcrumblist") ||
+      cleanAction.includes("product schema") ||
+      cleanAction.includes("faqpage schema"))
+  ) {
+    return [
+      "Add SoftwareApplication, Product, Organization, BreadcrumbList, or FAQPage schema where appropriate. Only add FAQPage schema if visible FAQs are added first.",
+      "- SoftwareApplication: for the SaaS product.",
+      "- Product: where product fields are visible.",
+      "- Organization: for company-level details.",
+      "- BreadcrumbList: for navigation.",
+      "- FAQPage: only when visible FAQ questions and answers exist on the page."
+    ].join("\n");
+  }
+
   if (cleanAction.includes("faqpage schema")) {
     return getFaqJsonLd(page);
   }
 
   if (cleanAction.includes("internal links")) {
     return formatInternalLinkRecommendations(page);
+  }
+
+  if (
+    page.intentMode === "saas" &&
+    (cleanAction.includes("product positioning") ||
+      cleanAction.includes("feature") ||
+      cleanAction.includes("use-case") ||
+      cleanAction.includes("use case") ||
+      cleanAction.includes("integrations") ||
+      cleanAction.includes("comparison") ||
+      cleanAction.includes("visuals") ||
+      cleanAction.includes("screenshots") ||
+      cleanAction.includes("pricing") ||
+      cleanAction.includes("demo") ||
+      cleanAction.includes("trial") ||
+      cleanAction.includes("signup"))
+  ) {
+    return [
+      "Add SaaS product structure only where it matches visible product facts.",
+      "",
+      "Suggested section labels:",
+      "- Key features",
+      "- Use cases",
+      "- Integrations",
+      "- Pricing and trial",
+      "- Product screenshots",
+      "- Compare alternatives"
+    ].join("\n");
+  }
+
+  if (
+    page.intentMode === "saas" &&
+    (cleanAction.includes("testimonials") ||
+      cleanAction.includes("case studies") ||
+      cleanAction.includes("security") ||
+      cleanAction.includes("compliance"))
+  ) {
+    return [
+      "Use only accurate SaaS trust wording.",
+      "",
+      "CASE STUDY / TESTIMONIAL RULE",
+      "- Only include testimonials, case studies, customer names, metrics, or outcomes if the business owner confirms they are real.",
+      "- Do not invent customers, results, screenshots, integrations, compliance claims, or security certifications."
+    ].join("\n");
   }
 
   if (
@@ -818,27 +987,13 @@ function getCodeOrContent(action: PrioritizedAction, page: ReportPageDetails): s
     ].join("\n");
   }
 
-  if (
-    page.intentMode === "affiliate" &&
-    (cleanAction.includes("product, review") ||
-      cleanAction.includes("itemlist") ||
-      cleanAction.includes("product schema") ||
-      cleanAction.includes("review schema"))
-  ) {
-    return [
-      "Add Product, Review, or ItemList schema where appropriate. Only add FAQPage schema if visible FAQs are added first.",
-      "- Product: for a single reviewed product.",
-      "- Review: for real review content.",
-      "- ItemList: for ranked roundups.",
-      "- FAQPage: only when visible FAQ questions and answers exist on the page."
-    ].join("\n");
-  }
-
   if (cleanAction.includes("schema blocks") || cleanAction.includes("consolidate")) {
     return [
       "No code yet.",
       page.intentMode === "affiliate"
         ? "First list each detected Product, Review, ItemList, or FAQPage schema source and any conflicting product, review, item, or FAQ values."
+        : page.intentMode === "saas"
+          ? "First list each detected SoftwareApplication, Product, Organization, BreadcrumbList, or FAQPage schema source and any conflicting product, organization, breadcrumb, or FAQ values."
         : "First list each detected LocalBusiness schema source and any conflicting name, URL, phone, address, openingHours, geo, or areaServed values.",
       "Stop before editing and ask for approval."
     ].join("\n");
@@ -923,6 +1078,22 @@ function getValidationSteps(
 ): string[] {
   const cleanAction = action.action.toLowerCase();
 
+  if (
+    intentMode === "saas" &&
+    (cleanAction.includes("softwareapplication") ||
+      cleanAction.includes("product schema") ||
+      cleanAction.includes("organization") ||
+      cleanAction.includes("breadcrumblist") ||
+      cleanAction.includes("faqpage schema"))
+  ) {
+    return [
+      "Run Google Rich Results Test.",
+      "Run Schema.org validator.",
+      "Validate SoftwareApplication/Product/FAQPage schema where used.",
+      "Confirm FAQPage schema only matches visible FAQs."
+    ];
+  }
+
   if (cleanAction.includes("faqpage schema")) {
     return [
       "Run Google Rich Results Test.",
@@ -951,9 +1122,13 @@ function getValidationSteps(
     return [
       intentMode === "affiliate"
         ? "List all detected Product, Review, ItemList, and FAQPage schema blocks and their source if known."
+        : intentMode === "saas"
+          ? "List all detected SoftwareApplication, Product, Organization, BreadcrumbList, and FAQPage schema blocks and their source if known."
         : "List all detected schema blocks and their source if known.",
       intentMode === "affiliate"
         ? "Identify duplicate or conflicting product, review, list, or FAQ fields."
+        : intentMode === "saas"
+          ? "Identify duplicate or conflicting product, organization, breadcrumb, or FAQ fields."
         : "Identify duplicate or conflicting LocalBusiness fields.",
       "Stop and wait for approval before making any change."
     ];
@@ -1091,6 +1266,8 @@ function formatBenchmarkContext(
         `- ${
           mode === "affiliate"
             ? "Products/buyer topics detected"
+            : mode === "saas"
+              ? "Products/use cases detected"
             : mode === "blog-media"
               ? "Topics/entities detected"
               : "Topics/services detected"
@@ -1123,15 +1300,20 @@ function formatBenchmarkInsightsContext(
 
   const isBlogMedia = insights.intentMode === "blog-media";
   const isAffiliate = insights.intentMode === "affiliate";
+  const isSaas = insights.intentMode === "saas";
   const coverageLabel = isBlogMedia
     ? "Topic coverage"
     : isAffiliate
       ? "Buyer intent coverage"
+      : isSaas
+        ? "Product/use-case coverage"
       : "Service coverage";
   const overlapLabel = isBlogMedia
     ? "Topic/entity overlap:"
     : isAffiliate
       ? "Product/entity overlap:"
+      : isSaas
+        ? "Product/entity overlap:"
       : "Topic/service overlap:";
 
   return [
@@ -1175,6 +1357,7 @@ function formatBenchmarkInsightsContext(
 function formatBenchmarkActionGroups(insights: BenchmarkInsights): string[] {
   const isBlogMedia = insights.intentMode === "blog-media";
   const isAffiliate = insights.intentMode === "affiliate";
+  const isSaas = insights.intentMode === "saas";
   const groups: Array<{ title: string; items: string[] }> = [];
 
   if (insights.targetWordCount < insights.averageWordCount) {
@@ -1187,6 +1370,8 @@ function formatBenchmarkActionGroups(insights: BenchmarkInsights): string[] {
           ? "Add more semantic depth, examples, and practical editorial detail"
           : isAffiliate
             ? "Add more buyer detail, comparison criteria, and product decision support"
+            : isSaas
+              ? "Add more product detail, use cases, feature depth, and SaaS evaluation support"
           : "Add more service detail and local relevance"
       ]
     });
@@ -1202,6 +1387,8 @@ function formatBenchmarkActionGroups(insights: BenchmarkInsights): string[] {
         ? "Expand topic coverage"
         : isAffiliate
           ? "Expand buyer intent coverage"
+          : isSaas
+            ? "Expand product/use-case coverage"
           : "Expand service coverage",
       items: insights.priorityActionGroups.serviceCoverage
     },
@@ -1392,6 +1579,12 @@ export function generateAiTaskPack({
     "- Before making changes, explain the plan.",
     "- After making changes, stop and summarise.",
     "- Do not continue to the next task until approved.",
+    ...(page.intentMode === "saas"
+      ? [
+          "- CASE STUDY / TESTIMONIAL RULE: Only include testimonials, case studies, customer names, metrics, or outcomes if the business owner confirms they are real.",
+          "- Do not invent customers, results, screenshots, integrations, compliance claims, or security certifications."
+        ]
+      : []),
     "",
     "WORKING CONTEXT",
     "- You are editing the live WordPress site only.",

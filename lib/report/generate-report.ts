@@ -105,6 +105,10 @@ function getReportTitle(mode?: IntentMode): string {
     return "AFFILIATE CONTENT DEVELOPER TASK SHEET";
   }
 
+  if (mode === "saas") {
+    return "SAAS CONTENT DEVELOPER TASK SHEET";
+  }
+
   return "LOCAL SEO DEVELOPER TASK SHEET";
 }
 
@@ -288,6 +292,34 @@ const affiliateInternalTopics = [
   "value"
 ];
 
+const saasInternalTopics = [
+  "feature",
+  "features",
+  "use case",
+  "use-case",
+  "use cases",
+  "pricing",
+  "demo",
+  "free trial",
+  "trial",
+  "signup",
+  "sign-up",
+  "integrations",
+  "integration",
+  "docs",
+  "documentation",
+  "help center",
+  "help centre",
+  "support",
+  "comparison",
+  "compare",
+  "alternatives",
+  "security",
+  "api",
+  "customers",
+  "case study"
+];
+
 function classifyInternalUrl(url: string): InternalLinkRecommendation["pageType"] {
   try {
     const parsedUrl = new URL(url);
@@ -340,6 +372,10 @@ function getInternalLinkTopics(mode?: IntentMode): string[] {
     return affiliateInternalTopics;
   }
 
+  if (mode === "saas") {
+    return saasInternalTopics;
+  }
+
   return serviceTopics;
 }
 
@@ -376,6 +412,7 @@ function getInternalLinkRecommendations(
 ): InternalLinkRecommendationGroups {
   const isBlogMedia = page.intentMode === "blog-media";
   const isAffiliate = page.intentMode === "affiliate";
+  const isSaas = page.intentMode === "saas";
   const currentPageUrl = normalizeUrlForComparison(page.url);
   const recommendations = page.relatedInternalLinks
     .filter((link) => normalizeUrlForComparison(link.url) !== currentPageUrl)
@@ -474,6 +511,37 @@ function getInternalLinkRecommendations(
         };
       }
 
+      if (isSaas) {
+        if (
+          destinationTopics.length > 0 &&
+          pageType !== "location_page" &&
+          pageType !== "contact_page"
+        ) {
+          return {
+            confidence: "high",
+            pageType,
+            reason: `High confidence: SaaS product/use-case content matches ${destinationTopics[0]}.`,
+            text: link.text,
+            topic: displayTopic,
+            url: link.url
+          };
+        }
+
+        return {
+          confidence: "medium",
+          pageType,
+          reason:
+            "Rejected: SaaS mode should link to features, use cases, pricing, integrations, docs, comparisons, alternatives, demo, trial, or signup pages.",
+          rejectedReason:
+            pageType === "location_page"
+              ? "Avoid location pages for SaaS mode unless the page genuinely supports the product/use-case topic."
+              : "No clear SaaS product/use-case topic match.",
+          text: link.text,
+          topic: displayTopic,
+          url: link.url
+        };
+      }
+
       if (
         anchorTopics.length > 0 &&
         pageType === "service_page" &&
@@ -560,16 +628,19 @@ function formatInternalLinkRecommendations(page: ReportPageDetails): string {
   const recommendations = getInternalLinkRecommendations(page);
   const isBlogMedia = page.intentMode === "blog-media";
   const isAffiliate = page.intentMode === "affiliate";
+  const isSaas = page.intentMode === "saas";
   const formatLink = (link: InternalLinkRecommendation) =>
     `- ${cleanReportText(link.text)} → ${link.url}\n  Reason: ${link.reason}`;
 
   if (
-    (isBlogMedia || isAffiliate) &&
+    (isBlogMedia || isAffiliate || isSaas) &&
     hasRelevantEditorialInternalLinks(recommendations)
   ) {
     return [
       isAffiliate
         ? "Relevant affiliate internal links already present."
+        : isSaas
+          ? "Relevant SaaS internal links already present."
         : "Relevant editorial internal links already present.",
       "",
       "Detected relevant internal links",
@@ -602,6 +673,8 @@ function formatInternalLinkRecommendations(page: ReportPageDetails): string {
                   ? "Medium confidence: useful topic match, but check it supports the article intent."
                   : isAffiliate
                     ? "Medium confidence: useful buyer-intent topic match, but check it is not an unrelated local page."
+                    : isSaas
+                      ? "Medium confidence: useful product/use-case topic match, but check it supports the SaaS evaluation journey."
                   : "Medium confidence: not a dedicated service page."
               }`
           )
@@ -635,6 +708,8 @@ function formatInternalLinkRecommendations(page: ReportPageDetails): string {
         ? "Do not force an internal link. Create or confirm a relevant guide, checklist, or supporting article first."
         : isAffiliate
           ? "Do not force an internal link. Create or confirm a relevant review, comparison, roundup, or buying guide first."
+          : isSaas
+            ? "Do not force an internal link. Create or confirm a real feature, pricing, integration, docs, comparison, alternatives, demo, trial, signup, or use-case page first."
         : "Do not force an internal link. Create or confirm a dedicated page first.",
       "",
       "Rejected or risky links",
@@ -657,7 +732,11 @@ function formatInternalLinkRecommendations(page: ReportPageDetails): string {
 }
 
 function formatExistingEditorialInternalLinks(page: ReportPageDetails): string {
-  if (page.intentMode !== "blog-media" && page.intentMode !== "affiliate") {
+  if (
+    page.intentMode !== "blog-media" &&
+    page.intentMode !== "affiliate" &&
+    page.intentMode !== "saas"
+  ) {
     return "";
   }
 
@@ -674,6 +753,8 @@ function formatExistingEditorialInternalLinks(page: ReportPageDetails): string {
     "INTERNAL LINK STATUS",
     page.intentMode === "affiliate"
       ? "Relevant affiliate internal links already present."
+      : page.intentMode === "saas"
+        ? "Relevant SaaS internal links already present."
       : "Relevant editorial internal links already present.",
     "",
     "Detected relevant internal links",
@@ -701,8 +782,8 @@ function getReportFaqItems(page: ReportPageDetails): Array<{
   }));
 }
 
-function getAssistantInstructions(): string[] {
-  return [
+function getAssistantInstructions(mode?: IntentMode): string[] {
+  const instructions = [
     "INSTRUCTIONS FOR DEVELOPER OR AI ASSISTANT",
     "- Do not review this report generally.",
     "- Convert each task into direct implementation instructions.",
@@ -716,6 +797,17 @@ function getAssistantInstructions(): string[] {
     "- Only include a case study if the business owner confirms it happened.",
     "- Do not invent customer examples, locations, devices, problems, fixes, or turnaround times."
   ];
+
+  if (mode === "saas") {
+    instructions.push(
+      "",
+      "CASE STUDY / TESTIMONIAL RULE",
+      "- Only include testimonials, case studies, customer names, metrics, or outcomes if the business owner confirms they are real.",
+      "- Do not invent customers, results, screenshots, integrations, compliance claims, or security certifications."
+    );
+  }
+
+  return instructions;
 }
 
 function listItems(
@@ -850,9 +942,11 @@ function formatBenchmark(
         `- ${
           mode === "affiliate"
             ? "Products/buyer topics detected"
-            : mode === "blog-media"
-              ? "Topics/entities detected"
-              : "Topics/services detected"
+            : mode === "saas"
+              ? "Products/use cases detected"
+              : mode === "blog-media"
+                ? "Topics/entities detected"
+                : "Topics/services detected"
         }: ${
           competitor.topicsServices.length
             ? competitor.topicsServices.map(cleanReportText).join(", ")
@@ -874,6 +968,7 @@ function formatBenchmark(
 function formatBenchmarkActionGroups(insights: BenchmarkInsights): string {
   const isBlogMedia = insights.intentMode === "blog-media";
   const isAffiliate = insights.intentMode === "affiliate";
+  const isSaas = insights.intentMode === "saas";
   const groups: Array<{ title: string; items: string[] }> = [];
 
   if (insights.targetWordCount < insights.averageWordCount) {
@@ -886,6 +981,8 @@ function formatBenchmarkActionGroups(insights: BenchmarkInsights): string {
           ? "Add more semantic depth, examples, and practical editorial detail"
           : isAffiliate
             ? "Add more buyer detail, comparison criteria, and product decision support"
+            : isSaas
+              ? "Add more product detail, use cases, feature depth, and SaaS evaluation support"
           : "Add more service detail and local relevance"
       ]
     });
@@ -901,6 +998,8 @@ function formatBenchmarkActionGroups(insights: BenchmarkInsights): string {
         ? "Expand topic coverage"
         : isAffiliate
           ? "Expand buyer intent coverage"
+          : isSaas
+            ? "Expand product/use-case coverage"
           : "Expand service coverage",
       items: insights.priorityActionGroups.serviceCoverage
     },
@@ -927,15 +1026,20 @@ function formatBenchmarkInsights(insights?: BenchmarkInsights | null): string {
 
   const isBlogMedia = insights.intentMode === "blog-media";
   const isAffiliate = insights.intentMode === "affiliate";
+  const isSaas = insights.intentMode === "saas";
   const coverageLabel = isBlogMedia
     ? "Topic coverage"
     : isAffiliate
       ? "Buyer intent coverage"
+      : isSaas
+        ? "Product/use-case coverage"
       : "Service coverage";
   const overlapLabel = isBlogMedia
     ? "Topic/entity overlap:"
     : isAffiliate
       ? "Product/entity overlap:"
+      : isSaas
+        ? "Product/entity overlap:"
       : "Topic/service overlap:";
 
   return [
@@ -1003,6 +1107,7 @@ function getDoNotChangeItems(
 ): string[] {
   const isBlogMedia = mode === "blog-media";
   const isAffiliate = mode === "affiliate";
+  const isSaas = mode === "saas";
   const items: string[] = [];
 
   if (
@@ -1023,12 +1128,15 @@ function getDoNotChangeItems(
         ? "Existing article sections/headings are useful. Improve them rather than replacing them."
         : isAffiliate
           ? "Existing buyer sections/headings are useful. Improve them rather than replacing them."
+          : isSaas
+            ? "Existing product sections/headings are useful. Improve them rather than replacing them."
         : "Existing service sections/headings are useful. Improve them rather than replacing them."
     );
   }
 
   if (
     !isAffiliate &&
+    !isSaas &&
     (result.signals.hasPhoneNumber || result.signals.ctaWords.length > 0)
   ) {
     items.push(
@@ -1040,6 +1148,8 @@ function getDoNotChangeItems(
     items.push(
       isAffiliate
         ? `Existing affiliate trust signals are useful: ${result.signals.trustSignals.join(", ")}.`
+        : isSaas
+          ? `Existing SaaS trust signals are useful: ${result.signals.trustSignals.join(", ")}.`
         : `Existing review/trust content is useful: ${result.signals.trustSignals.join(", ")}.`
     );
   }
@@ -1048,6 +1158,8 @@ function getDoNotChangeItems(
     items.push(
       isAffiliate
         ? "Keep any accurate product details, affiliate disclosure, reviewer notes, and buyer guidance that are already on the page."
+        : isSaas
+          ? "Keep any accurate product details, feature copy, use-case copy, CTAs, proof, screenshots, and SaaS trust content that are already on the page."
         : "Keep any accurate business details, service copy, phone numbers, and existing trust content that are already on the page."
     );
   }
@@ -1083,6 +1195,58 @@ function getTaskDetails(
         `Example title: Best ${targetKeyword.replace(/^best\s+/i, "")} Tested & Reviewed`,
       expectedOutcome:
         "Readers and search engines can quickly understand the affiliate review or buying-guide topic."
+    };
+  }
+
+  if (page.intentMode === "saas" && cleanAction.includes("page title")) {
+    return {
+      whereToImplement:
+        "SEO title field, page title, or product page title setting.",
+      whatToChange:
+        "Rewrite the title so the SaaS product topic, product category, or use case is clear.",
+      example:
+        `Example title: ${targetKeyword} Software for Growing Teams`,
+      expectedOutcome:
+        "Readers and search engines can quickly understand the SaaS product and use-case promise."
+    };
+  }
+
+  if (
+    page.intentMode === "affiliate" &&
+    (cleanAction.includes("product, review") ||
+      cleanAction.includes("itemlist") ||
+      cleanAction.includes("product schema") ||
+      cleanAction.includes("review schema"))
+  ) {
+    return {
+      whereToImplement:
+        "SEO plugin custom schema field, page head, or page-level JSON-LD injection area.",
+      whatToChange:
+        "Add Product, Review, or ItemList schema where appropriate. Only add FAQPage schema if visible FAQs are added first.",
+      example:
+        "Use Product schema for a single reviewed product, Review schema for real review content, and ItemList schema for ranked roundups. Do not add FAQPage schema unless visible FAQ questions and answers exist on the page.",
+      expectedOutcome:
+        "Structured data supports affiliate buyer content without using LocalBusiness or location schema."
+    };
+  }
+
+  if (
+    page.intentMode === "saas" &&
+    (cleanAction.includes("softwareapplication") ||
+      cleanAction.includes("organization") ||
+      cleanAction.includes("breadcrumblist") ||
+      cleanAction.includes("product schema") ||
+      cleanAction.includes("faqpage schema"))
+  ) {
+    return {
+      whereToImplement:
+        "SEO plugin custom schema field, page head, or page-level JSON-LD injection area.",
+      whatToChange:
+        "Add SoftwareApplication, Product, Organization, BreadcrumbList, or FAQPage schema where appropriate. Only add FAQPage schema if visible FAQs are added first.",
+      example:
+        "Use SoftwareApplication schema for the SaaS product, Product schema where product fields are visible, Organization schema for the company, BreadcrumbList for navigation, and FAQPage only for visible FAQ questions and answers.",
+      expectedOutcome:
+        "Structured data supports SaaS product content without using LocalBusiness or location schema."
     };
   }
 
@@ -1134,6 +1298,7 @@ function getTaskDetails(
   if (cleanAction.includes("internal links")) {
     const isBlogMedia = page.intentMode === "blog-media";
     const isAffiliate = page.intentMode === "affiliate";
+    const isSaas = page.intentMode === "saas";
 
     return {
       whereToImplement:
@@ -1141,12 +1306,16 @@ function getTaskDetails(
           ? "Inside relevant article sections in the main page content."
           : isAffiliate
             ? "Inside relevant buyer sections in the main page content."
+            : isSaas
+              ? "Inside relevant product sections in the main page content."
           : "Inside relevant service sections in the main page content.",
       whatToChange:
         isBlogMedia
           ? "Add only contextually relevant internal links to supporting articles, guides, checklists, or explainers where the topic matches the article section."
           : isAffiliate
             ? "Add only contextually relevant internal links to product reviews, best-of roundups, comparison articles, or buying guides where the topic matches the buyer section."
+            : isSaas
+              ? "Add only contextually relevant internal links to feature, pricing, integration, docs/help, comparison, alternatives, demo/trial/signup, or use-case pages where the topic matches the product section."
           : "Add only contextually relevant internal links where the anchor topic matches the destination topic.",
       example: formatInternalLinkRecommendations(page),
       expectedOutcome:
@@ -1154,7 +1323,75 @@ function getTaskDetails(
           ? "Readers and search engines can move more easily between related editorial topic-cluster content."
           : isAffiliate
             ? "Readers and search engines can move more easily between related buyer-intent reviews, comparisons, and guides."
+            : isSaas
+              ? "Prospects and search engines can move more easily between related SaaS product, feature, use-case, and conversion pages."
           : "Visitors and search engines can move more easily between related service pages."
+    };
+  }
+
+  if (
+    page.intentMode === "saas" &&
+    (cleanAction.includes("product positioning") ||
+      cleanAction.includes("feature") ||
+      cleanAction.includes("use-case") ||
+      cleanAction.includes("use case") ||
+      cleanAction.includes("integrations") ||
+      cleanAction.includes("comparison") ||
+      cleanAction.includes("visuals") ||
+      cleanAction.includes("screenshots") ||
+      cleanAction.includes("pricing") ||
+      cleanAction.includes("demo") ||
+      cleanAction.includes("trial") ||
+      cleanAction.includes("signup"))
+  ) {
+    return {
+      whereToImplement:
+        "Inside the main SaaS product content, near the relevant product, feature, use-case, pricing, integration, or CTA section.",
+      whatToChange:
+        "Add clear product sections that explain what the SaaS product does, who it helps, why it matters, and what the next step is.",
+      example:
+        "Example product section labels: Key features, Use cases, Integrations, Pricing and trial, Product screenshots, Compare alternatives.",
+      expectedOutcome:
+        "The page gives clearer product-led SEO coverage without adding local SEO or affiliate roundup wording."
+    };
+  }
+
+  if (
+    page.intentMode === "saas" &&
+    (cleanAction.includes("testimonials") ||
+      cleanAction.includes("case studies") ||
+      cleanAction.includes("security") ||
+      cleanAction.includes("compliance"))
+  ) {
+    return {
+      whereToImplement:
+        "Near the relevant trust, customer proof, security, compliance, or product evaluation section.",
+      whatToChange:
+        "Add only accurate SaaS trust wording. Do not invent customers, metrics, outcomes, screenshots, integrations, compliance claims, or security certifications.",
+      example:
+        "Business owner must confirm any testimonial, case study, customer name, metric, security certification, compliance claim, or integration before publishing.",
+      expectedOutcome:
+        "The page gains SaaS trust proof without adding unverified claims."
+    };
+  }
+
+  if (
+    page.intentMode === "saas" &&
+    (cleanAction.includes("softwareapplication") ||
+      cleanAction.includes("organization") ||
+      cleanAction.includes("breadcrumblist") ||
+      cleanAction.includes("product schema") ||
+      cleanAction.includes("faqpage schema"))
+  ) {
+    return {
+      whereToImplement:
+        "SEO plugin custom schema field, page head, or page-level JSON-LD injection area.",
+      whatToChange:
+        "Add SoftwareApplication, Product, Organization, BreadcrumbList, or FAQPage schema where appropriate. Only add FAQPage schema if visible FAQs are added first.",
+      example:
+        "Use SoftwareApplication schema for the SaaS product, Product schema where product fields are visible, Organization schema for the company, BreadcrumbList for navigation, and FAQPage only for visible FAQ questions and answers.",
+      expectedOutcome:
+        "Structured data supports SaaS product content without using LocalBusiness or location schema."
     };
   }
 
@@ -1379,6 +1616,22 @@ function getDeveloperQaChecklist(mode?: IntentMode): string[] {
     ];
   }
 
+  if (mode === "saas") {
+    return [
+      "- Run Google Rich Results Test",
+      "- Validate JSON-LD",
+      "- Check page still has one H1",
+      "- Check demo/free trial/signup CTA works",
+      "- Check pricing links work",
+      "- Check integration links work",
+      "- Check screenshots/product visuals load on mobile",
+      "- Validate SoftwareApplication/Product/FAQPage schema",
+      "- Check FAQPage schema only matches visible FAQs",
+      "- Check testimonials/case studies are real and approved",
+      "- Check no duplicate/conflicting LocalBusiness schema remains unless the site genuinely needs it"
+    ];
+  }
+
   return [
     "- Run Google Rich Results Test",
     "- Validate JSON-LD",
@@ -1398,7 +1651,7 @@ export function generateDeveloperReport({
   return [
     getReportTitle(page.intentMode),
     "",
-    ...getAssistantInstructions(),
+    ...getAssistantInstructions(page.intentMode),
     "",
     "PAGE DETAILS",
     `- Intent mode: ${getIntentModeLabel(page.intentMode)}`,

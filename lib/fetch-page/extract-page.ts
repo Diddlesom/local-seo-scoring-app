@@ -421,7 +421,25 @@ function extractRelatedInternalLinks(
     "price",
     "deal",
     "discount",
-    "value"
+    "value",
+    "feature",
+    "features",
+    "use case",
+    "use-case",
+    "pricing",
+    "demo",
+    "free trial",
+    "signup",
+    "integrations",
+    "integration",
+    "docs",
+    "documentation",
+    "help center",
+    "help centre",
+    "comparison",
+    "alternatives",
+    "security",
+    "api"
   ];
   const links = new Map<string, { score: number; text: string; url: string }>();
   let match = linkPattern.exec(html);

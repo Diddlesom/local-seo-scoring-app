@@ -422,6 +422,58 @@ const affiliateTopicPatterns: Array<{ label: string; patterns: RegExp[] }> = [
   }
 ];
 
+const saasTopicPatterns: Array<{ label: string; patterns: RegExp[] }> = [
+  {
+    label: "product entities",
+    patterns: [
+      /\b(?:software|platform|app|application|tool|suite|dashboard|workspace|product)\b/i,
+      /\b[A-Z][A-Za-z0-9]+(?:\s+[A-Z][A-Za-z0-9]+){1,3}\b/
+    ]
+  },
+  {
+    label: "product category",
+    patterns: [
+      /\b(?:crm|cms|erp|analytics|automation|helpdesk|project management|email marketing|seo|accounting|hr|sales|support)\b/i
+    ]
+  },
+  {
+    label: "feature coverage",
+    patterns: [/\b(?:feature|features|workflow|automation|dashboard|reporting|collaboration|api)\b/i]
+  },
+  {
+    label: "use cases/personas",
+    patterns: [/\b(?:use case|use cases|persona|personas|industry|industries|for teams|for agencies|for startups|for enterprise)\b/i]
+  },
+  {
+    label: "pricing/free trial/demo language",
+    patterns: [/\b(?:pricing|price|free trial|trial|demo|book a demo|sign up|signup|contact sales|plans?)\b/i]
+  },
+  {
+    label: "integrations",
+    patterns: [/\b(?:integration|integrations|connects with|works with|zapier|slack|salesforce|hubspot|google|microsoft)\b/i]
+  },
+  {
+    label: "comparison/alternatives sections",
+    patterns: [/\b(?:alternative|alternatives|comparison|compare|versus| vs\.? |competitor|competitors)\b/i]
+  },
+  {
+    label: "testimonials/case studies",
+    patterns: [/\b(?:testimonial|case stud(?:y|ies)|customer story|trusted by|customer results)\b/i]
+  },
+  {
+    label: "security/compliance trust signals",
+    patterns: [/\b(?:security|secure|soc\s?2|iso\s?27001|gdpr|hipaa|compliance|sso|encryption)\b/i]
+  },
+  {
+    label: "product screenshots/media",
+    patterns: [/<img\b|<video\b|\b(?:screenshot|screenshots|product tour|demo video|walkthrough|interface|ui)\b/i]
+  },
+  {
+    label: "FAQ coverage",
+    patterns: [/\b(?:faq|frequently asked questions|questions and answers)\b/i]
+  }
+];
+
 const executionModes: Array<{
   description: string;
   label: string;
@@ -494,6 +546,12 @@ function detectTopicsServices(
 
   if (intentMode === "affiliate") {
     return affiliateTopicPatterns
+      .filter((topic) => topic.patterns.some((pattern) => pattern.test(text)))
+      .map((topic) => topic.label);
+  }
+
+  if (intentMode === "saas") {
+    return saasTopicPatterns
       .filter((topic) => topic.patterns.some((pattern) => pattern.test(text)))
       .map((topic) => topic.label);
   }
@@ -819,12 +877,16 @@ function getTopRecommendedNextStep({
       ? "Improve editorial trust with author expertise, first-hand experience, freshness signals, citations, or related resources."
       : intentMode === "affiliate"
         ? "Improve affiliate trust signals with disclosure, author/reviewer expertise, first-hand testing notes, and freshness signals."
+        : intentMode === "saas"
+          ? "Improve SaaS trust signals with real testimonials, case studies, security/compliance details, support links, and company expertise."
         : "Improve trust signals with visible reviews, testimonials, guarantees, or named expert proof.";
   const topicAction =
     intentMode === "blog-media"
       ? "Expand informational coverage with semantic depth, troubleshooting detail, and PAA-style questions."
       : intentMode === "affiliate"
         ? "Expand buyer intent coverage with comparison criteria, pros and cons, best-for labels, and buyer guide detail."
+        : intentMode === "saas"
+          ? "Expand product/use-case coverage with features, benefits, personas, integrations, pricing, and comparison detail."
         : "Expand service coverage for important services competitors mention but your page does not.";
 
   const gaps = [
@@ -946,6 +1008,8 @@ function buildBenchmarkInsights({
       ? "topic coverage"
       : intentMode === "affiliate"
         ? "buyer intent coverage"
+        : intentMode === "saas"
+          ? "product/use-case coverage"
         : "service coverage";
   const belowAverageAreas = [
     contentGap > 0 ? "content depth" : "",
@@ -973,6 +1037,8 @@ function buildBenchmarkInsights({
               ? "Add more semantic depth, examples, and practical editorial detail"
               : intentMode === "affiliate"
                 ? "Add more buyer detail, comparison criteria, and product decision support"
+                : intentMode === "saas"
+                  ? "Add more product detail, use cases, feature depth, and SaaS evaluation support"
                 : "Add more service detail and local relevance"
           ]
         : [],
@@ -991,6 +1057,13 @@ function buildBenchmarkInsights({
               "Add first-hand testing notes where accurate",
               "Add freshness/date signals"
             ]
+          : intentMode === "saas"
+            ? [
+                "Add real testimonials or case studies if approved",
+                "Add security or compliance details where accurate",
+                "Add support/help documentation links",
+                "Add company or product-team expertise"
+              ]
         : [
             "Add testimonials (used by competitors)",
             "Add customer-style review wording",
@@ -1011,6 +1084,13 @@ function buildBenchmarkInsights({
               "Add best-for labels",
               "Add a buyer guide section"
             ]
+          : intentMode === "saas"
+            ? [
+                "Add feature sections",
+                "Add use-case or persona sections",
+                "Add integrations detail",
+                "Add pricing, free trial, demo, or signup detail"
+              ]
         : [
             "Add a computer repair section",
             "Add a pc repair section",
@@ -1028,6 +1108,12 @@ function buildBenchmarkInsights({
               "Break recommendations into clearer buyer sections",
               "Add Product, Review, ItemList, or FAQPage schema where appropriate"
             ]
+          : intentMode === "saas"
+            ? [
+                "Add screenshots or product visuals",
+                "Break content into clearer product sections",
+                "Add SoftwareApplication, Product, Organization, BreadcrumbList, or FAQPage schema where appropriate"
+              ]
         : [
             "Add more service subheadings",
             "Break content into clearer sections"
@@ -1056,11 +1142,15 @@ function buildBenchmarkInsights({
           ? "Topic coverage is below the competitor average."
           : intentMode === "affiliate"
             ? "Buyer intent coverage is below the competitor average."
+            : intentMode === "saas"
+              ? "Product/use-case coverage is below the competitor average."
             : "Service coverage is below the competitor average."
         : intentMode === "blog-media"
           ? "Topic coverage is competitive against the current benchmark."
           : intentMode === "affiliate"
             ? "Buyer intent coverage is competitive against the current benchmark."
+            : intentMode === "saas"
+              ? "Product/use-case coverage is competitive against the current benchmark."
             : "Service coverage is competitive against the current benchmark.",
       belowAverageAreas.length > 0
         ? `Summary: your page is behind competitors on ${belowAverageAreas.join(", ")}.`
@@ -1158,6 +1248,8 @@ function formatIssueText(issue: string, intentMode: IntentMode): string {
       ? "⚠️ Low content depth detected. Expand article sections with more semantic detail, examples, and supporting links."
       : intentMode === "affiliate"
         ? "⚠️ Low content depth detected. Expand buyer sections with product detail, comparison criteria, and decision support."
+        : intentMode === "saas"
+          ? "⚠️ Low content depth detected. Expand product sections with features, use cases, integrations, proof, and CTA detail."
       : "⚠️ Low content depth detected. Expand service sections and add more local detail to improve rankings.";
   }
 
@@ -1168,6 +1260,8 @@ function formatIssueText(issue: string, intentMode: IntentMode): string {
       ? "⚠️ Low content depth detected. Expand article sections with more semantic detail, examples, and supporting links."
       : intentMode === "affiliate"
         ? "⚠️ Low content depth detected. Expand buyer sections with product detail, comparison criteria, and decision support."
+        : intentMode === "saas"
+          ? "⚠️ Low content depth detected. Expand product sections with features, use cases, integrations, proof, and CTA detail."
       : "⚠️ Low content depth detected. Expand service sections and add more local detail to improve rankings.";
   }
 
@@ -1216,6 +1310,8 @@ function TopIssues({
           ? "Pages with stronger semantic depth, editorial trust signals, and related internal links tend to perform better for informational searches."
           : intentMode === "affiliate"
             ? "Pages with stronger buyer intent coverage, affiliate trust signals, and relevant comparison links tend to perform better for commercial searches."
+            : intentMode === "saas"
+              ? "Pages with stronger product positioning, SaaS trust signals, conversion paths, and product architecture tend to perform better for SaaS searches."
           : "Pages with stronger content depth, trust signals, and internal linking tend to perform better for local service searches."}
       </p>
       <a className="guided-link" href="#recommended-actions">
@@ -1241,6 +1337,8 @@ function CategoryScoreBar({
       ? "Topic coverage"
       : intentMode === "affiliate" && category === "localSignals"
         ? "Buyer intent coverage"
+        : intentMode === "saas" && category === "localSignals"
+          ? "Product/use-case coverage"
       : categoryLabels[category];
 
   return (
@@ -1315,6 +1413,7 @@ function BenchmarkInsightsPanel({
 }) {
   const isBlogMedia = insights.intentMode === "blog-media";
   const isAffiliate = insights.intentMode === "affiliate";
+  const isSaas = insights.intentMode === "saas";
   const actionGroups = [
     ["Increase content depth", insights.priorityActionGroups.contentDepth],
     ["Improve trust signals", insights.priorityActionGroups.trustSignals],
@@ -1323,6 +1422,8 @@ function BenchmarkInsightsPanel({
         ? "Expand topic coverage"
         : isAffiliate
           ? "Expand buyer intent coverage"
+          : isSaas
+            ? "Expand product/use-case coverage"
           : "Expand service coverage",
       insights.priorityActionGroups.serviceCoverage
     ],
@@ -1354,6 +1455,8 @@ function BenchmarkInsightsPanel({
                 ? "Topic coverage"
                 : isAffiliate
                   ? "Buyer intent coverage"
+                  : isSaas
+                    ? "Product/use-case coverage"
                   : "Service coverage"}
             </strong>
             {insights.overallPositionSections.serviceCoverage}
@@ -1381,6 +1484,8 @@ function BenchmarkInsightsPanel({
             ? "Topic/entity overlap"
             : isAffiliate
               ? "Product/entity overlap"
+              : isSaas
+                ? "Product/entity overlap"
               : "Topic/service overlap"}
         </h3>
         <ResultList items={insights.topicServiceOverlap} />
@@ -2337,6 +2442,8 @@ export default function Home() {
                       <dt>
                         {form.intentMode === "affiliate"
                           ? "Products/buyer topics detected"
+                          : form.intentMode === "saas"
+                            ? "Products/use cases detected"
                           : form.intentMode === "blog-media"
                             ? "Topics/entities detected"
                             : "Topics/services detected"}

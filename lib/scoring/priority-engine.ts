@@ -101,6 +101,50 @@ export function createPriorityActions(
     return actions;
   }
 
+  if (intentMode === "saas") {
+    if (!signals.titleKeywordMatch) {
+      actions.push({
+        id: "add-product-topic-to-title",
+        title: "Make the SaaS product topic clear in the page title",
+        priority: "high"
+      });
+    }
+
+    if (!signals.metaDescriptionKeywordMatch) {
+      actions.push({
+        id: "add-product-topic-to-meta-description",
+        title: "Make the SaaS product topic clear in the meta description",
+        priority: "medium"
+      });
+    }
+
+    if (!signals.topicSignals.includes("Features")) {
+      actions.push({
+        id: "add-feature-sections",
+        title: "Add clear product feature sections",
+        priority: "high"
+      });
+    }
+
+    if (!signals.topicSignals.includes("Use cases/personas")) {
+      actions.push({
+        id: "add-use-case-sections",
+        title: "Add use-case or persona sections",
+        priority: "medium"
+      });
+    }
+
+    if (!signals.topicSignals.includes("Pricing/free trial/demo language")) {
+      actions.push({
+        id: "add-demo-trial-pricing-cta",
+        title: "Add pricing, free trial, demo, or signup CTA wording",
+        priority: "high"
+      });
+    }
+
+    return actions;
+  }
+
   if (!signals.titleKeywordMatch) {
     actions.push({
       id: "add-keyword-to-title",
@@ -353,6 +397,36 @@ const affiliateInternalLinkTopics = [
   "value"
 ];
 
+const saasInternalLinkTopics = [
+  "feature",
+  "features",
+  "use case",
+  "use-case",
+  "use cases",
+  "pricing",
+  "demo",
+  "free trial",
+  "trial",
+  "signup",
+  "sign-up",
+  "integrations",
+  "integration",
+  "docs",
+  "documentation",
+  "help",
+  "help center",
+  "help centre",
+  "support",
+  "comparison",
+  "compare",
+  "alternatives",
+  "alternative",
+  "customers",
+  "case study",
+  "security",
+  "api"
+];
+
 function classifyBlogMediaInternalLink(url: string): "editorial" | "weak" {
   try {
     const path = new URL(url).pathname.toLowerCase();
@@ -465,6 +539,35 @@ function hasRelevantAffiliateInternalLinks(
     );
 
     return hasTopicMatch && !isWeakAffiliateInternalUrl(link.url);
+  });
+
+  return relevantLinks.length >= 1;
+}
+
+function isWeakSaasInternalUrl(url: string): boolean {
+  try {
+    return /(location|areas-we-cover|near-me|service-area|chard|ilminster|somerset|yeovil|taunton)/.test(
+      new URL(url).pathname.toLowerCase()
+    );
+  } catch {
+    return false;
+  }
+}
+
+function hasRelevantSaasInternalLinks(
+  links?: ScoringInput["relatedInternalLinks"]
+): boolean {
+  if (!links || links.length === 0) {
+    return false;
+  }
+
+  const relevantLinks = links.filter((link) => {
+    const comparable = `${link.text} ${link.url}`.toLowerCase();
+    const hasTopicMatch = saasInternalLinkTopics.some((topic) =>
+      comparable.includes(topic)
+    );
+
+    return hasTopicMatch && !isWeakSaasInternalUrl(link.url);
   });
 
   return relevantLinks.length >= 1;
@@ -806,6 +909,251 @@ function createAffiliatePrioritizedActions(
     .sort((a, b) => b.estimatedScoreGain - a.estimatedScoreGain);
 }
 
+function createSaasPrioritizedActions(
+  input: ScoringInput,
+  signals: ExtractedSignals
+): PrioritizedAction[] {
+  const actions: PrioritizedAction[] = [];
+  const pageText = `${input.text ?? ""}\n${input.html ?? ""}`;
+  const schemaSource = input.schemaJson ?? "";
+  const detectedInternalLinks = [
+    ...(input.relatedInternalLinks ?? []),
+    ...extractInternalLinksFromHtml(input.websiteUrl, input.html)
+  ];
+  const schemaTypes = new Set(signals.schemaTypes);
+  const hasProductPositioning = signals.topicSignals.includes("Product name/entities");
+  const hasFeatures = signals.topicSignals.includes("Features");
+  const hasBenefits = signals.topicSignals.includes("Benefits");
+  const hasUseCases = signals.topicSignals.includes("Use cases/personas");
+  const hasIntegrations = signals.topicSignals.includes("Integrations");
+  const hasPricingOrDemo = signals.topicSignals.includes(
+    "Pricing/free trial/demo language"
+  );
+  const hasComparison = signals.topicSignals.includes(
+    "Comparison/alternatives content"
+  );
+  const hasOnboarding = signals.topicSignals.includes("Onboarding/setup content");
+  const hasVisuals = signals.topicSignals.includes("Screenshots/product visuals");
+  const hasTestimonials = signals.trustSignals.includes(
+    "Testimonials/case studies"
+  );
+  const hasSecurity = signals.trustSignals.includes(
+    "Security/compliance trust signals"
+  );
+  const hasFaqCoverage = signals.trustSignals.includes("FAQs");
+  const hasRelevantInternalLinks =
+    hasRelevantSaasInternalLinks(detectedInternalLinks) ||
+    /\b(?:features|pricing|integrations|docs|help center|help centre|use cases|alternatives)\b/i.test(
+      pageText
+    );
+  const hasSaasSchema = [
+    "SoftwareApplication",
+    "Product",
+    "Organization",
+    "BreadcrumbList",
+    "FAQPage"
+  ].some((type) => schemaTypes.has(type));
+
+  if (!signals.titleKeywordMatch || !hasProductPositioning) {
+    actions.push(
+      createAction({
+        impact: 8,
+        ease: 8,
+        action: "Add clear SaaS product positioning.",
+        whyItMatters:
+          "SaaS pages need to quickly explain what the product is, who it is for, and what problem it solves."
+      })
+    );
+  }
+
+  if (!hasFeatures) {
+    actions.push(
+      createAction({
+        impact: 8,
+        ease: 7,
+        action: "Add clear product feature sections.",
+        whyItMatters:
+          "Feature sections help prospects understand what the product actually does."
+      })
+    );
+  }
+
+  if (!hasBenefits) {
+    actions.push(
+      createAction({
+        impact: 6,
+        ease: 7,
+        action: "Add benefit-led copy that explains the outcomes users get.",
+        whyItMatters:
+          "Benefits connect product features to practical business value."
+      })
+    );
+  }
+
+  if (!hasUseCases) {
+    actions.push(
+      createAction({
+        impact: 7,
+        ease: 6,
+        action: "Add use-case, industry, or persona sections.",
+        whyItMatters:
+          "Use-case sections help the page match more SaaS search intent and show who the product is built for."
+      })
+    );
+  }
+
+  if (!hasPricingOrDemo) {
+    actions.push(
+      createAction({
+        impact: 8,
+        ease: 8,
+        action: "Add pricing, free trial, demo, signup, or contact sales CTA wording.",
+        whyItMatters:
+          "SaaS visitors need a clear next step when evaluating a product."
+      })
+    );
+  }
+
+  if (!hasIntegrations) {
+    actions.push(
+      createAction({
+        impact: 6,
+        ease: 6,
+        action: "Add an integrations section where accurate.",
+        whyItMatters:
+          "Integrations help buyers understand how the product fits into their existing stack."
+      })
+    );
+  }
+
+  if (!hasComparison) {
+    actions.push(
+      createAction({
+        impact: 5,
+        ease: 5,
+        action: "Add comparison or alternatives content where relevant.",
+        whyItMatters:
+          "Comparison and alternatives sections help SaaS pages satisfy evaluation-stage searches."
+      })
+    );
+  }
+
+  if (!hasOnboarding) {
+    actions.push(
+      createAction({
+        impact: 4,
+        ease: 6,
+        action: "Add onboarding, setup, or implementation detail.",
+        whyItMatters:
+          "Setup information reduces friction for prospects wondering how hard the product is to adopt."
+      })
+    );
+  }
+
+  if (!hasVisuals) {
+    actions.push(
+      createAction({
+        impact: 6,
+        ease: 5,
+        action: "Add screenshots or product visuals.",
+        whyItMatters:
+          "Product visuals help prospects understand the interface before requesting a demo or trial."
+      })
+    );
+  }
+
+  if (!hasTestimonials) {
+    actions.push(
+      createAction({
+        impact: 6,
+        ease: 4,
+        action: "Add testimonials or case studies only if real and approved.",
+        whyItMatters:
+          "Real customer proof helps SaaS prospects trust the product, but invented claims create legal and credibility risk."
+      })
+    );
+  }
+
+  if (!hasSecurity) {
+    actions.push(
+      createAction({
+        impact: 5,
+        ease: 5,
+        action: "Add security or compliance details where accurate.",
+        whyItMatters:
+          "Security and compliance details reduce risk concerns for SaaS buyers."
+      })
+    );
+  }
+
+  if (!hasFaqCoverage) {
+    actions.push(
+      createAction({
+        impact: 5,
+        ease: 7,
+        action: "Add a short FAQ section for SaaS evaluation questions.",
+        whyItMatters:
+          "FAQs can answer product, pricing, setup, integration, and support questions."
+      })
+    );
+  }
+
+  if (!hasRelevantInternalLinks) {
+    actions.push(
+      createAction({
+        impact: 5,
+        ease: 6,
+        action:
+          "Add internal links to relevant features, pricing, integrations, docs, comparisons, alternatives, or use-case pages.",
+        whyItMatters:
+          "Relevant SaaS internal links help prospects continue evaluation and help search engines understand product architecture."
+      })
+    );
+  }
+
+  if (!hasSaasSchema) {
+    actions.push(
+      createAction({
+        impact: 6,
+        ease: 5,
+        action:
+          "Add SoftwareApplication, Product, Organization, BreadcrumbList, or FAQPage schema where appropriate.",
+        whyItMatters:
+          "SaaS-friendly schema clarifies the product, organization, navigation, and visible FAQ content."
+      })
+    );
+  } else if (countSchemaTypes(schemaSource) > 1) {
+    actions.push(
+      createAction({
+        impact: 3,
+        ease: 5,
+        action:
+          "Review SaaS schema blocks for consistency across SoftwareApplication, Product, Organization, BreadcrumbList, and FAQPage markup.",
+        whyItMatters:
+          "Consistent SaaS schema reduces conflicting product or organization data."
+      })
+    );
+  }
+
+  actions.push(
+    createAction({
+      impact: 3,
+      ease: 5,
+      action:
+        "SaaS scoring is in early support, so review recommendations against the product strategy and monetisation model before implementation.",
+      whyItMatters:
+        "The app now checks product-led SaaS signals, but full SaaS scoring is still being developed."
+    })
+  );
+
+  return actions
+    .filter(
+      (action, index, allActions) =>
+        allActions.findIndex((item) => item.action === action.action) === index
+    )
+    .sort((a, b) => b.estimatedScoreGain - a.estimatedScoreGain);
+}
+
 export function createPrioritizedActions(
   input: ScoringInput,
   signals: ExtractedSignals
@@ -819,6 +1167,10 @@ export function createPrioritizedActions(
 
   if (intentMode === "affiliate") {
     return createAffiliatePrioritizedActions(input, signals);
+  }
+
+  if (intentMode === "saas") {
+    return createSaasPrioritizedActions(input, signals);
   }
 
   const pageText = `${input.text ?? ""}\n${input.html ?? ""}`;
