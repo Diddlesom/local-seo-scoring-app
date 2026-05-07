@@ -653,10 +653,22 @@ function createBlogMediaPrioritizedActions(
     hasRelevantBlogMediaInternalLinks(detectedInternalLinks) ||
     /\brelated (?:articles|content|guides|resources)\b/i.test(pageText);
   const hasFaqCoverage = signals.trustSignals.includes("FAQ coverage");
+  const hasAuthorExpertise = signals.trustSignals.includes("Author expertise");
   const hasExamples = signals.trustSignals.includes(
     "Examples/tutorial style content"
   );
   const hasCitations = signals.trustSignals.includes("Citations/resources");
+  const hasTableOfContents = /\b(?:table of contents|contents|in this guide|on this page)\b/i.test(
+    pageText
+  );
+  const hasMedia = /<img\b|<picture\b|<video\b|\b(?:diagram|screenshot|screenshots|image|images|chart|table)\b/i.test(
+    pageText
+  );
+  const hasEditorialSchema = signals.schemaTypes.some((type) =>
+    ["Article", "BlogPosting", "FAQPage", "HowTo", "BreadcrumbList", "Organization"].includes(
+      type
+    )
+  );
 
   if (!signals.titleKeywordMatch) {
     actions.push(
@@ -718,6 +730,30 @@ function createBlogMediaPrioritizedActions(
     );
   }
 
+  if (!hasAuthorExpertise) {
+    actions.push(
+      createAction({
+        impact: 6,
+        ease: 6,
+        action: "Add a short author bio or expertise note.",
+        whyItMatters:
+          "Author expertise helps readers understand why the article can be trusted."
+      })
+    );
+  }
+
+  if (!hasTableOfContents) {
+    actions.push(
+      createAction({
+        impact: 4,
+        ease: 7,
+        action: "Add a table of contents or jump links for longer informational articles.",
+        whyItMatters:
+          "A table of contents helps readers scan the article and reach the section they need faster."
+      })
+    );
+  }
+
   if (!hasExamples) {
     actions.push(
       createAction({
@@ -743,14 +779,31 @@ function createBlogMediaPrioritizedActions(
   }
 
   actions.push(
-    createAction({
-      impact: 4,
-      ease: 5,
-      action: "Improve media richness with helpful images, screenshots, diagrams, video, or summary tables.",
-      whyItMatters:
-        "Media-rich articles are easier to scan, understand, and reuse."
-    })
+    ...(hasMedia
+      ? []
+      : [
+          createAction({
+            impact: 4,
+            ease: 5,
+            action:
+              "Improve media richness with helpful images, screenshots, diagrams, video, or summary tables.",
+            whyItMatters:
+              "Media-rich articles are easier to scan, understand, and reuse."
+          })
+        ])
   );
+
+  if (!hasEditorialSchema) {
+    actions.push(
+      createAction({
+        impact: 5,
+        ease: 5,
+        action: "Add Article, BlogPosting, HowTo, BreadcrumbList, or FAQPage schema where appropriate.",
+        whyItMatters:
+          "Intent-specific editorial schema clarifies article structure without relying on local business markup."
+      })
+    );
+  }
 
   return actions
     .filter(
@@ -956,17 +1009,6 @@ function createAffiliatePrioritizedActions(
     );
   }
 
-  actions.push(
-    createAction({
-      impact: 3,
-      ease: 5,
-      action:
-        "Affiliate scoring is in early support, so review recommendations against the affiliate strategy and monetisation model before implementation.",
-      whyItMatters:
-        "The app now checks buyer-intent signals, but full Affiliate scoring is still being developed."
-    })
-  );
-
   return actions
     .filter(
       (action, index, allActions) =>
@@ -1023,6 +1065,18 @@ function createSaasPrioritizedActions(
         "FAQPage"
       ];
   const hasSaasSchema = supportedSchemaTypes.some((type) => schemaTypes.has(type));
+  const hasPositioningEvidence =
+    hasProductPositioning &&
+    signals.topicSignals.length >= 4 &&
+    [
+      input.title ?? "",
+      ...(input.headings?.h1 ?? []),
+      ...(input.headings?.h2 ?? [])
+    ].some((value) =>
+      /\b(?:software|platform|app|product|tool|workspace|suite|solution|feature|features|project management|crm|analytics|automation)\b/i.test(
+        value
+      )
+    );
 
   if (isComparisonPage && (!signals.titleKeywordMatch || !hasComparison)) {
     actions.push(
@@ -1034,7 +1088,10 @@ function createSaasPrioritizedActions(
           "SaaS comparison and review pages need to explain which tools are being compared, the criteria used, and which use cases each option fits."
       })
     );
-  } else if (!signals.titleKeywordMatch || !hasProductPositioning) {
+  } else if (
+    (!signals.titleKeywordMatch || !hasProductPositioning) &&
+    !hasPositioningEvidence
+  ) {
     actions.push(
       createAction({
         impact: 8,
@@ -1254,17 +1311,6 @@ function createSaasPrioritizedActions(
       })
     );
   }
-
-  actions.push(
-    createAction({
-      impact: 3,
-      ease: 5,
-      action:
-        "SaaS scoring is in early support, so review recommendations against the product strategy and monetisation model before implementation.",
-      whyItMatters:
-        "The app now checks product-led SaaS signals, but full SaaS scoring is still being developed."
-    })
-  );
 
   return actions
     .filter(

@@ -10,6 +10,53 @@ import type {
   ScoringInput
 } from "./types";
 
+const preferredSchemaTypesByIntentMode: Record<IntentMode, string[]> = {
+  "local-seo": [
+    "LocalBusiness",
+    "Service",
+    "Review",
+    "Organization",
+    "BreadcrumbList",
+    "FAQPage"
+  ],
+  "blog-media": [
+    "Article",
+    "BlogPosting",
+    "FAQPage",
+    "HowTo",
+    "BreadcrumbList",
+    "Organization"
+  ],
+  affiliate: ["Product", "Review", "ItemList", "FAQPage", "Article", "BreadcrumbList"],
+  saas: [
+    "SoftwareApplication",
+    "Product",
+    "Organization",
+    "FAQPage",
+    "BreadcrumbList"
+  ]
+};
+
+function getRelevantSchemaTypes(
+  signals: ReturnType<typeof extractSignals>,
+  intentMode: IntentMode
+): string[] {
+  const preferredSchemaTypes = preferredSchemaTypesByIntentMode[intentMode];
+
+  return signals.schemaTypes.filter((type) => preferredSchemaTypes.includes(type));
+}
+
+function hasLocalBusinessSchemaOnly(
+  signals: ReturnType<typeof extractSignals>,
+  intentMode: IntentMode
+): boolean {
+  return (
+    intentMode !== "local-seo" &&
+    signals.schemaTypes.includes("LocalBusiness") &&
+    getRelevantSchemaTypes(signals, intentMode).length === 0
+  );
+}
+
 function getGrade(totalScore: number): ScoreResult["grade"] {
   if (totalScore >= 85) {
     return "A";
@@ -33,9 +80,7 @@ function getGrade(totalScore: number): ScoreResult["grade"] {
 function createCategoryScores(
   signals: ReturnType<typeof extractSignals>
 ): CategoryScores {
-  const localSchemaTypes = signals.schemaTypes.filter((type) =>
-    ["LocalBusiness", "Service", "FAQPage"].includes(type)
-  );
+  const localSchemaTypes = getRelevantSchemaTypes(signals, "local-seo");
 
   return {
     content: signals.wordCount >= 500 ? 15 : signals.wordCount >= 250 ? 10 : 5,
@@ -66,6 +111,8 @@ function getIntentMode(input: ScoringInput): IntentMode {
 function createBlogMediaCategoryScores(
   signals: ReturnType<typeof extractSignals>
 ): CategoryScores {
+  const blogMediaSchemaTypes = getRelevantSchemaTypes(signals, "blog-media");
+
   return {
     content: signals.wordCount >= 900 ? 15 : signals.wordCount >= 500 ? 10 : 5,
     headings:
@@ -81,16 +128,14 @@ function createBlogMediaCategoryScores(
     localSignals: Math.min(signals.topicSignals.length * 4, 15),
     trust: Math.min(signals.trustSignals.length * 2, 10),
     conversion: Math.min(signals.ctaWords.length * 3, 10),
-    schema: Math.min(signals.schemaTypes.length * 5, 15)
+    schema: Math.min(blogMediaSchemaTypes.length * 5, 15)
   };
 }
 
 function createAffiliateCategoryScores(
   signals: ReturnType<typeof extractSignals>
 ): CategoryScores {
-  const affiliateSchemaTypes = signals.schemaTypes.filter((type) =>
-    ["Product", "Review", "ItemList", "FAQPage", "Article"].includes(type)
-  );
+  const affiliateSchemaTypes = getRelevantSchemaTypes(signals, "affiliate");
 
   return {
     content: signals.wordCount >= 1000 ? 15 : signals.wordCount >= 600 ? 10 : 5,
@@ -114,18 +159,17 @@ function createAffiliateCategoryScores(
 function createSaasCategoryScores(
   signals: ReturnType<typeof extractSignals>
 ): CategoryScores {
-  const saasSchemaTypes = signals.schemaTypes.filter((type) =>
-    [
-      "SoftwareApplication",
-      "Product",
-      "Organization",
-      "BreadcrumbList",
-      "FAQPage"
-    ].includes(type)
-  );
+  const saasSchemaTypes = getRelevantSchemaTypes(signals, "saas");
+  const contentScore = signals.jsRenderingWarning
+    ? Math.max(10, signals.wordCount >= 900 ? 15 : signals.wordCount >= 500 ? 10 : 5)
+    : signals.wordCount >= 900
+      ? 15
+      : signals.wordCount >= 500
+        ? 10
+        : 5;
 
   return {
-    content: signals.wordCount >= 900 ? 15 : signals.wordCount >= 500 ? 10 : 5,
+    content: contentScore,
     headings:
       signals.headings.h1.length > 0 &&
       signals.headings.h2.length + signals.headings.h3.length >= 4
@@ -149,9 +193,7 @@ function createStrengths(
   intentMode: IntentMode = "local-seo"
 ): string[] {
   const strengths: string[] = [];
-  const localSchemaTypes = signals.schemaTypes.filter((type) =>
-    ["LocalBusiness", "Service", "FAQPage"].includes(type)
-  );
+  const relevantSchemaTypes = getRelevantSchemaTypes(signals, intentMode);
 
   if (categoryScores.content >= 10) {
     strengths.push("Page has a useful amount of written content.");
@@ -178,7 +220,7 @@ function createStrengths(
       );
     }
 
-    if (signals.schemaTypes.length > 0) {
+    if (relevantSchemaTypes.length > 0) {
       strengths.push("Page includes supported schema markup.");
     }
 
@@ -198,7 +240,7 @@ function createStrengths(
       );
     }
 
-    if (signals.schemaTypes.length > 0) {
+    if (relevantSchemaTypes.length > 0) {
       strengths.push("Page includes supported schema markup.");
     }
 
@@ -222,7 +264,7 @@ function createStrengths(
       strengths.push("Page includes product-led conversion wording.");
     }
 
-    if (signals.schemaTypes.length > 0) {
+    if (relevantSchemaTypes.length > 0) {
       strengths.push("Page includes supported schema markup.");
     }
 
@@ -247,7 +289,7 @@ function createStrengths(
     strengths.push("Page includes call-to-action wording.");
   }
 
-  if (localSchemaTypes.length > 0) {
+  if (relevantSchemaTypes.length > 0) {
     strengths.push("Page includes supported schema markup.");
   }
 
@@ -260,12 +302,12 @@ function createWeaknesses(
   intentMode: IntentMode = "local-seo"
 ): string[] {
   const weaknesses: string[] = [];
-  const localSchemaTypes = signals.schemaTypes.filter((type) =>
-    ["LocalBusiness", "Service", "FAQPage"].includes(type)
-  );
+  const relevantSchemaTypes = getRelevantSchemaTypes(signals, intentMode);
 
-  if (categoryScores.content < 10) {
+  if (categoryScores.content < 10 && !signals.jsRenderingWarning) {
     weaknesses.push("Page content is thin.");
+  } else if (signals.jsRenderingWarning) {
+    weaknesses.push("Content may be incomplete due to JavaScript rendering limitations.");
   }
 
   if (signals.headings.h1.length === 0) {
@@ -297,7 +339,11 @@ function createWeaknesses(
       weaknesses.push("No clear reader next-step wording was found.");
     }
 
-    if (signals.schemaTypes.length === 0) {
+    if (hasLocalBusinessSchemaOnly(signals, intentMode)) {
+      weaknesses.push(
+        "Detected schema appears primarily local-business focused rather than intent-specific."
+      );
+    } else if (relevantSchemaTypes.length === 0) {
       weaknesses.push("No supported schema markup was found.");
     }
 
@@ -322,11 +368,13 @@ function createWeaknesses(
     }
 
     if (
-      !signals.schemaTypes.some((type) =>
-        ["Product", "Review", "ItemList", "FAQPage"].includes(type)
-      )
+      relevantSchemaTypes.length === 0
     ) {
-      weaknesses.push("No Affiliate-supported schema markup was found.");
+      weaknesses.push(
+        hasLocalBusinessSchemaOnly(signals, intentMode)
+          ? "Detected schema appears primarily local-business focused rather than intent-specific."
+          : "No Affiliate-supported schema markup was found."
+      );
     }
 
     return weaknesses;
@@ -350,17 +398,13 @@ function createWeaknesses(
     }
 
     if (
-      !signals.schemaTypes.some((type) =>
-        [
-          "SoftwareApplication",
-          "Product",
-          "Organization",
-          "BreadcrumbList",
-          "FAQPage"
-        ].includes(type)
-      )
+      relevantSchemaTypes.length === 0
     ) {
-      weaknesses.push("No SaaS-supported schema markup was found.");
+      weaknesses.push(
+        hasLocalBusinessSchemaOnly(signals, intentMode)
+          ? "Detected schema appears primarily local-business focused rather than intent-specific."
+          : "No SaaS-supported schema markup was found."
+      );
     }
 
     return weaknesses;
@@ -386,7 +430,7 @@ function createWeaknesses(
     weaknesses.push("No clear call-to-action wording was found.");
   }
 
-  if (localSchemaTypes.length === 0) {
+  if (relevantSchemaTypes.length === 0) {
     weaknesses.push("No supported schema markup was found.");
   }
 

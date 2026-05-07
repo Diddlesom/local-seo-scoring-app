@@ -39,6 +39,7 @@ export type ExtractedSignals = {
   ctaWords: string[];
   schemaTypes: string[];
   evidence: string[];
+  jsRenderingWarning?: boolean;
 };
 
 export type PriorityAction = {

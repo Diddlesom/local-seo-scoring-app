@@ -895,6 +895,26 @@ function isSaasTrustLikeGap(value: string): boolean {
   );
 }
 
+function dedupeSimilarGaps(items: string[]): string[] {
+  const seen = new Set<string>();
+  const output: string[] = [];
+
+  items.forEach((item) => {
+    const key = item
+      .toLowerCase()
+      .replace(/\s+coverage\b/g, "")
+      .replace(/\s+\(used by competitors\)/g, "")
+      .trim();
+
+    if (!seen.has(key)) {
+      seen.add(key);
+      output.push(item);
+    }
+  });
+
+  return output;
+}
+
 function formatBenchmark(
   benchmark?: BenchmarkCompetitor[],
   mode?: IntentMode
@@ -982,7 +1002,9 @@ function formatBenchmark(
         }`,
         "Target page gaps found:",
         listItems(
-          competitor.gapsFound.map((gap) => simplifyBenchmarkGap(gap, mode)),
+          dedupeSimilarGaps(
+            competitor.gapsFound.map((gap) => simplifyBenchmarkGap(gap, mode))
+          ),
           "- No consistent patterns detected across competitors yet"
         )
       ]
@@ -1105,7 +1127,7 @@ function formatBenchmarkInsights(insights?: BenchmarkInsights | null): string {
     "",
     "Key gaps on your page:",
     listItems(
-      insights.keyGaps,
+      dedupeSimilarGaps(insights.keyGaps),
       "- No consistent patterns detected across competitors yet"
     ),
     "",

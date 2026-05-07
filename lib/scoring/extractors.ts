@@ -199,6 +199,45 @@ function findMatches(text: string, words: readonly string[]): string[] {
   return words.filter((word) => cleanText.includes(word.toLowerCase()));
 }
 
+const ctaWordsByIntentMode: Record<IntentMode, readonly string[]> = {
+  "local-seo": [
+    "call",
+    "book",
+    "quote",
+    "schedule",
+    "visit",
+    "repair",
+    "contact"
+  ],
+  "blog-media": [
+    "read more",
+    "learn more",
+    "continue reading",
+    "subscribe",
+    "download guide",
+    "related articles",
+    "newsletter"
+  ],
+  affiliate: [
+    "check price",
+    "buy now",
+    "view deal",
+    "see on amazon",
+    "best price",
+    "compare",
+    "shop now"
+  ],
+  saas: [
+    "free trial",
+    "get started",
+    "request demo",
+    "book demo",
+    "start free",
+    "sign up",
+    "pricing"
+  ]
+};
+
 function findTrustSignals(text: string): string[] {
   const cleanText = normalise(text);
   const signals = new Set<string>();
@@ -643,6 +682,21 @@ function findSchemaTypes(schemaSource: string): string[] {
   );
 }
 
+function appearsJsRendered(html: string, wordCount: number): boolean {
+  if (wordCount >= 250 || html.length < 1500) {
+    return false;
+  }
+
+  const scriptCount = html.match(/<script\b/gi)?.length ?? 0;
+  const appShellSignals =
+    /__NEXT_DATA__|data-reactroot|id=["'](?:root|__next|app)["']|<noscript\b/i.test(
+      html
+    );
+  const bodyText = stripHtml(html);
+
+  return scriptCount >= 5 || (appShellSignals && countWords(bodyText) < 250);
+}
+
 export function extractSignals(input: ScoringInput): ExtractedSignals {
   const intentMode: IntentMode = input.intentMode ?? "local-seo";
   const html = input.html ?? "";
@@ -667,21 +721,7 @@ export function extractSignals(input: ScoringInput): ExtractedSignals {
         : intentMode === "saas"
           ? findSaasTopicSignals(`${pageText}\n${html}`, headings)
         : [];
-  const ctaWords = findMatches(
-    pageText,
-    intentMode === "saas"
-      ? [
-          ...scoringConfig.ctaWords,
-          "demo",
-          "free trial",
-          "trial",
-          "sign up",
-          "signup",
-          "get started",
-          "contact sales"
-        ]
-      : scoringConfig.ctaWords
-  );
+  const ctaWords = findMatches(pageText, ctaWordsByIntentMode[intentMode]);
   const schemaTypes = findSchemaTypes(schemaSource);
   const locationMentionCount = countPhrase(pageText, input.location);
   const hasPhoneNumber = findPhoneNumber(pageText);
@@ -698,6 +738,8 @@ export function extractSignals(input: ScoringInput): ExtractedSignals {
     input.location
   );
   const wordCount = countWords(pageText);
+  const jsRenderingWarning =
+    intentMode === "saas" && appearsJsRendered(html, wordCount);
   const evidence = [
     `Word count: ${wordCount}`,
     `Headings found: ${headings.h1.length} H1, ${headings.h2.length} H2, ${headings.h3.length} H3`,
@@ -728,7 +770,19 @@ export function extractSignals(input: ScoringInput): ExtractedSignals {
       : "No CTA words detected",
     schemaTypes.length > 0
       ? `Schema types: ${schemaTypes.join(", ")}`
-      : "No target schema types detected"
+      : "No target schema types detected",
+    ...(intentMode !== "local-seo" &&
+    schemaTypes.includes("LocalBusiness") &&
+    schemaTypes.filter((type) =>
+      getPreferredSchemaTypes(intentMode).includes(type)
+    ).length === 0
+      ? [
+          "Detected schema appears primarily local-business focused rather than intent-specific."
+        ]
+      : []),
+    ...(jsRenderingWarning
+      ? ["Content may be incomplete due to JavaScript rendering limitations."]
+      : [])
   ];
 
   return {
@@ -743,6 +797,43 @@ export function extractSignals(input: ScoringInput): ExtractedSignals {
     topicSignals,
     ctaWords,
     schemaTypes,
-    evidence
+    evidence,
+    jsRenderingWarning
   };
+}
+
+function getPreferredSchemaTypes(intentMode: IntentMode): string[] {
+  if (intentMode === "blog-media") {
+    return [
+      "Article",
+      "BlogPosting",
+      "FAQPage",
+      "HowTo",
+      "BreadcrumbList",
+      "Organization"
+    ];
+  }
+
+  if (intentMode === "affiliate") {
+    return ["Product", "Review", "ItemList", "FAQPage", "Article", "BreadcrumbList"];
+  }
+
+  if (intentMode === "saas") {
+    return [
+      "SoftwareApplication",
+      "Product",
+      "Organization",
+      "FAQPage",
+      "BreadcrumbList"
+    ];
+  }
+
+  return [
+    "LocalBusiness",
+    "Service",
+    "Review",
+    "Organization",
+    "BreadcrumbList",
+    "FAQPage"
+  ];
 }

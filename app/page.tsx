@@ -186,6 +186,13 @@ const intentModeLabels: Record<IntentMode, string> = {
 const modeNotice =
   "This mode is in early support. Recommendations are adjusted lightly but full scoring is still being developed.";
 
+const formTitles: Record<IntentMode, string> = {
+  "local-seo": "Score a local service page",
+  "blog-media": "Score a blog post or informational article",
+  affiliate: "Score an affiliate or buyer-intent page",
+  saas: "Score a SaaS product or software page"
+};
+
 const localTopicKeywords = [
   "laptop repair",
   "computer repair",
@@ -602,7 +609,10 @@ function getBenchmarkGaps({
   }
 
   competitor.signals.schemaTypes.forEach((schemaType) => {
-    if (!targetResult.signals.schemaTypes.includes(schemaType)) {
+    if (
+      getPreferredSchemaTypes(intentMode).includes(schemaType) &&
+      !targetResult.signals.schemaTypes.includes(schemaType)
+    ) {
       gaps.add(
         `Add or review ${schemaType} schema because this competitor uses it and your target page does not.`
       );
@@ -834,7 +844,59 @@ function isSaasTrustLikeGap(value: string): boolean {
 }
 
 function uniqueItems(items: string[]): string[] {
-  return Array.from(new Set(items));
+  const seen = new Set<string>();
+  const output: string[] = [];
+
+  items.forEach((item) => {
+    const key = item
+      .toLowerCase()
+      .replace(/\s+coverage\b/g, "")
+      .replace(/\s+\(used by competitors\)/g, "")
+      .trim();
+
+    if (!seen.has(key)) {
+      seen.add(key);
+      output.push(item);
+    }
+  });
+
+  return output;
+}
+
+function getPreferredSchemaTypes(intentMode: IntentMode): string[] {
+  if (intentMode === "blog-media") {
+    return [
+      "Article",
+      "BlogPosting",
+      "FAQPage",
+      "HowTo",
+      "BreadcrumbList",
+      "Organization"
+    ];
+  }
+
+  if (intentMode === "affiliate") {
+    return ["Product", "Review", "ItemList", "FAQPage", "Article", "BreadcrumbList"];
+  }
+
+  if (intentMode === "saas") {
+    return [
+      "SoftwareApplication",
+      "Product",
+      "Organization",
+      "FAQPage",
+      "BreadcrumbList"
+    ];
+  }
+
+  return [
+    "LocalBusiness",
+    "Service",
+    "Review",
+    "Organization",
+    "BreadcrumbList",
+    "FAQPage"
+  ];
 }
 
 function groupPriorityActions(actions: string[]): BenchmarkInsights["priorityActionGroups"] {
@@ -1016,7 +1078,11 @@ function buildBenchmarkInsights({
         `Add visible ${signal.value.toLowerCase()} because ${formatCompetitorCount(signal.count, competitors.length)} show it.`
     );
   const missingMajoritySchemaTypes = majoritySchemaTypes
-    .filter((schema) => !targetResult.signals.schemaTypes.includes(schema.value))
+    .filter(
+      (schema) =>
+        getPreferredSchemaTypes(intentMode).includes(schema.value) &&
+        !targetResult.signals.schemaTypes.includes(schema.value)
+    )
     .map(
       (schema) =>
         `Add or validate ${schema.value} schema because ${formatCompetitorCount(schema.count, competitors.length)} use it.`
@@ -2169,15 +2235,15 @@ export default function Home() {
         <div>
           <span className="product-badge">CWC Local SEO Toolkit</span>
           <h1>
-            Score local service pages and turn gaps into clear, actionable SEO
-            tasks.
+            {formTitles[form.intentMode]} and turn gaps into clear,
+            actionable SEO tasks.
           </h1>
           <p>
             Fetch a page, analyse real content, and export tasks your developer
             or AI can execute.
           </p>
           <p className="credibility-line">
-            Built for local SEO pages, service businesses, and real-world
+            Built for practical content checks, schema review, and real-world
             ranking improvements.
           </p>
         </div>
@@ -2189,7 +2255,7 @@ export default function Home() {
         <div className="card-heading">
           <div>
             <span className="eyebrow">Page Input</span>
-            <h2>Score a local service page</h2>
+            <h2>{formTitles[form.intentMode]}</h2>
           </div>
           <button
             className="outline-button"
@@ -2273,14 +2339,26 @@ export default function Home() {
               </button>
             </span>
             <span className="helper-text">
-              Tip: Use a real service page URL for best results.
+              Tip: Use a real {form.intentMode === "local-seo"
+                ? "service page"
+                : form.intentMode === "blog-media"
+                  ? "article"
+                  : form.intentMode === "affiliate"
+                    ? "buyer-intent page"
+                    : "SaaS product page"} URL for best results.
             </span>
           </label>
         </div>
 
         <p className="form-tip">
-          Use a live service page URL, then review the extracted content before
-          scoring.
+          Use a live {form.intentMode === "local-seo"
+            ? "service page"
+            : form.intentMode === "blog-media"
+              ? "article"
+              : form.intentMode === "affiliate"
+                ? "buyer-intent page"
+                : "SaaS product page"} URL, then review the extracted content
+          before scoring.
         </p>
 
         {form.intentMode !== "local-seo" ? (

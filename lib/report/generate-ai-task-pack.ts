@@ -800,6 +800,26 @@ function isSaasTrustLikeGap(value: string): boolean {
   );
 }
 
+function dedupeSimilarGaps(items: string[]): string[] {
+  const seen = new Set<string>();
+  const output: string[] = [];
+
+  items.forEach((item) => {
+    const key = item
+      .toLowerCase()
+      .replace(/\s+coverage\b/g, "")
+      .replace(/\s+\(used by competitors\)/g, "")
+      .trim();
+
+    if (!seen.has(key)) {
+      seen.add(key);
+      output.push(item);
+    }
+  });
+
+  return output;
+}
+
 function getFaqJsonLd(page: ReportPageDetails): string {
   const faqItems = page.faqItems.length
     ? page.faqItems
@@ -1345,8 +1365,9 @@ function formatBenchmarkContext(
         }`,
         "Target page gaps found:",
         competitor.gapsFound.length
-          ? competitor.gapsFound
-              .map((gap) => simplifyBenchmarkGap(gap, mode))
+          ? dedupeSimilarGaps(
+              competitor.gapsFound.map((gap) => simplifyBenchmarkGap(gap, mode))
+            )
               .map((gap) => `- ${cleanText(gap)}`)
               .join("\n")
           : "- No consistent patterns detected across competitors yet"
@@ -1408,7 +1429,7 @@ function formatBenchmarkInsightsContext(
     "",
     "Key gaps on target page:",
     ...(insights.keyGaps.length
-      ? insights.keyGaps.map((gap) => `- ${cleanText(gap)}`)
+      ? dedupeSimilarGaps(insights.keyGaps).map((gap) => `- ${cleanText(gap)}`)
       : ["- No consistent patterns detected across competitors yet"]),
     "",
     "Top recommended next step:",
