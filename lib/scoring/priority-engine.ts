@@ -580,11 +580,63 @@ function hasRelevantSaasInternalLinks(
 }
 
 function isSaasComparisonPage(input: ScoringInput): boolean {
-  const comparable = `${input.keyword ?? ""}\n${input.title ?? ""}\n${input.metaDescription ?? ""}\n${input.text ?? ""}\n${input.html ?? ""}`;
+  const urlPath = getUrlPath(input.websiteUrl);
+  const titleAndMeta = `${input.title ?? ""}\n${input.metaDescription ?? ""}`;
+  const headings = [
+    ...(input.headings?.h1 ?? []),
+    ...(input.headings?.h2 ?? []),
+    ...(input.headings?.h3 ?? [])
+  ].join("\n");
+  const targetContent = `${input.text ?? ""}\n${headings}\n${input.html ?? ""}`;
 
-  return /\b(?:best|top|review|reviews|comparison|compare|versus| vs\.? |alternative|alternatives|competitor|competitors)\b/i.test(
-    comparable
+  const hasComparisonUrl =
+    /(?:^|\/)(?:best|compare|comparison|alternatives?|reviews?|top-tools?)(?:\/|-|$)/i.test(
+      urlPath
+    ) || /(?:^|\/|-)vs(?:-|\/|$)/i.test(urlPath);
+
+  const hasComparisonTitleOrMeta =
+    /\b(?:best|top tools?|alternatives?|vs\.?|versus|compare|comparison|reviews?)\b/i.test(
+      titleAndMeta
+    );
+
+  const hasComparisonHeading =
+    /\b(?:best .* tools?|top .* tools?|alternatives? to|comparison table|versus|vs\.?|compare .* software|reviews?)\b/i.test(
+      headings
+    );
+
+  const comparisonSignals = [
+    /\bcomparison table\b/i,
+    /\bkey features compared\b/i,
+    /\bpricing(?:\/|\s+and\s+)?free trial comparison\b/i,
+    /\bintegrations compared\b/i,
+    /\bbest for\b/i,
+    /\bpros and cons\b/i,
+    /\balternatives to\b/i,
+    /\btop tools?\b/i,
+    /\bvs\.?\b|\bversus\b/i
+  ];
+  const signalCount = comparisonSignals.filter((pattern) =>
+    pattern.test(targetContent)
+  ).length;
+
+  return (
+    hasComparisonUrl ||
+    hasComparisonTitleOrMeta ||
+    hasComparisonHeading ||
+    signalCount >= 2
   );
+}
+
+function getUrlPath(url?: string): string {
+  if (!url) {
+    return "";
+  }
+
+  try {
+    return new URL(url).pathname.toLowerCase();
+  } catch {
+    return url.toLowerCase();
+  }
 }
 
 function createBlogMediaPrioritizedActions(

@@ -759,6 +759,10 @@ function simplifyBenchmarkGap(gap: string, mode?: IntentMode): string {
     const trustMatch = gap.match(/for (.*?) because/i);
     const trustSignal = trustMatch?.[1] ?? "trust proof";
 
+    if (mode === "saas" && isSaasTrustLikeGap(trustSignal)) {
+      return `Missing ${trustSignal}`;
+    }
+
     return `Missing ${trustSignal} (used by competitors)`;
   }
 
@@ -773,6 +777,10 @@ function simplifyBenchmarkGap(gap: string, mode?: IntentMode): string {
     const topicMatch = gap.match(/for (.*?) because/i);
     const topic = topicMatch?.[1] ?? "product/use-case";
 
+    if (mode === "saas" && isSaasTrustLikeGap(topic)) {
+      return `Missing ${topic}`;
+    }
+
     return `Missing ${topic} coverage`;
   }
 
@@ -784,6 +792,12 @@ function simplifyBenchmarkGap(gap: string, mode?: IntentMode): string {
   }
 
   return gap;
+}
+
+function isSaasTrustLikeGap(value: string): boolean {
+  return /\b(?:testimonial|case stud|security|compliance|trust|faq)\b/i.test(
+    value
+  );
 }
 
 function getFaqJsonLd(page: ReportPageDetails): string {
