@@ -3,7 +3,11 @@ import type {
   BenchmarkInsights,
   ReportPageDetails
 } from "./generate-report";
-import type { PrioritizedAction, ScoreResult } from "../scoring/types";
+import type {
+  IntentMode,
+  PrioritizedAction,
+  ScoreResult
+} from "../scoring/types";
 
 type GenerateAiTaskPackInput = {
   page: ReportPageDetails;
@@ -24,6 +28,23 @@ const priorityRank: Record<PrioritizedAction["priority"], number> = {
   medium: 1,
   low: 2
 };
+
+const intentModeLabels: Record<IntentMode, string> = {
+  "local-seo": "Local SEO",
+  affiliate: "Affiliate",
+  saas: "SaaS",
+  "blog-media": "Blog / Media"
+};
+
+function getIntentModeLabel(mode?: IntentMode): string {
+  return intentModeLabels[mode ?? "local-seo"];
+}
+
+function getIntentModeNotice(mode?: IntentMode): string {
+  return mode && mode !== "local-seo"
+    ? "This mode is in early support. Recommendations are adjusted lightly but full scoring is still being developed."
+    : "";
+}
 
 export type ExecutionMode = "fast" | "balanced" | "thorough";
 
@@ -894,6 +915,8 @@ function generateFastInternalLinkTaskPack({
     "",
     "Task: Add ONE internal link to the target page.",
     "",
+    `Intent mode: ${getIntentModeLabel(page.intentMode)}`,
+    ...formatOptionalLine("Mode notice", getIntentModeNotice(page.intentMode)),
     `Target page: ${page.url || "Not provided"}`,
     "",
     "Add this one internal link once.",
@@ -937,6 +960,8 @@ function generateFastAiTaskPack({
     "You are editing the live WordPress site only.",
     "",
     "Mode: FAST",
+    `Intent mode: ${getIntentModeLabel(page.intentMode)}`,
+    ...formatOptionalLine("Mode notice", getIntentModeNotice(page.intentMode)),
     `Target page: ${page.url || "Not provided"}`,
     ...formatOptionalLine("Keyword", page.keyword),
     ...formatOptionalLine("Location", page.location),
@@ -1010,6 +1035,10 @@ export function generateAiTaskPack({
     "- Work only inside WordPress/admin/browser tools.",
     "",
     "PAGE CONTEXT",
+    `- Intent mode: ${getIntentModeLabel(page.intentMode)}`,
+    ...(getIntentModeNotice(page.intentMode)
+      ? [`- Mode notice: ${getIntentModeNotice(page.intentMode)}`]
+      : []),
     `- Target keyword: ${page.keyword ? cleanText(page.keyword) : "Not provided"}`,
     `- Location: ${page.location ? cleanText(page.location) : "Not provided"}`,
     `- URL: ${page.url || "Not provided"}`,

@@ -1,5 +1,8 @@
+export type IntentMode = "local-seo" | "affiliate" | "saas" | "blog-media";
+
 export type ScoringInput = {
   businessName?: string;
+  intentMode?: IntentMode;
   keyword?: string;
   location?: string;
   title?: string;

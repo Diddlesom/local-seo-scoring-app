@@ -1,6 +1,11 @@
-import type { PrioritizedAction, ScoreResult } from "../scoring/types";
+import type {
+  IntentMode,
+  PrioritizedAction,
+  ScoreResult
+} from "../scoring/types";
 
 export type ReportPageDetails = {
+  intentMode?: IntentMode;
   keyword: string;
   location: string;
   url: string;
@@ -78,6 +83,23 @@ const priorityLabels: Record<PrioritizedAction["priority"], string> = {
   medium: "Medium priority",
   low: "Low priority"
 };
+
+const intentModeLabels: Record<IntentMode, string> = {
+  "local-seo": "Local SEO",
+  affiliate: "Affiliate",
+  saas: "SaaS",
+  "blog-media": "Blog / Media"
+};
+
+function getIntentModeLabel(mode?: IntentMode): string {
+  return intentModeLabels[mode ?? "local-seo"];
+}
+
+function getIntentModeNotice(mode?: IntentMode): string {
+  return mode && mode !== "local-seo"
+    ? "This mode is in early support. Recommendations are adjusted lightly but full scoring is still being developed."
+    : "";
+}
 
 function decodeHtmlEntities(text: string): string {
   return text
@@ -964,6 +986,10 @@ export function generateDeveloperReport({
     ...getAssistantInstructions(),
     "",
     "PAGE DETAILS",
+    `- Intent mode: ${getIntentModeLabel(page.intentMode)}`,
+    ...(getIntentModeNotice(page.intentMode)
+      ? [`- Mode notice: ${getIntentModeNotice(page.intentMode)}`]
+      : []),
     `- Target keyword: ${page.keyword ? cleanReportText(page.keyword) : "Not provided"}`,
     `- Location: ${page.location ? cleanReportText(page.location) : "Not provided"}`,
     `- URL: ${page.url || "Not provided"}`,

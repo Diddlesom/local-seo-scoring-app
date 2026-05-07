@@ -1,5 +1,6 @@
 import type {
   ExtractedSignals,
+  IntentMode,
   PrioritizedAction,
   PriorityAction,
   ScoringInput
@@ -99,6 +100,99 @@ function createAction(input: ActionInput): PrioritizedAction {
   };
 }
 
+function getIntentMode(input: ScoringInput): IntentMode {
+  return input.intentMode ?? "local-seo";
+}
+
+function adjustActionForIntentMode(
+  action: PrioritizedAction,
+  mode: IntentMode
+): PrioritizedAction {
+  if (mode === "local-seo") {
+    return action;
+  }
+
+  const cleanAction = action.action.toLowerCase();
+
+  if (mode === "affiliate") {
+    if (cleanAction.includes("localbusiness schema")) {
+      return {
+        ...action,
+        action: "Review structured data for affiliate content, such as Article, Product, Review, or FAQPage schema where relevant.",
+        whyItMatters:
+          "Affiliate pages need clear content and product context; full affiliate scoring is still being developed."
+      };
+    }
+
+    if (cleanAction.includes("target location")) {
+      return {
+        ...action,
+        action: "Make the target topic clear in the page content.",
+        whyItMatters:
+          "Affiliate recommendations should clearly connect the page content to the reader's buying or comparison intent."
+      };
+    }
+  }
+
+  if (mode === "saas") {
+    if (cleanAction.includes("phone number")) {
+      return {
+        ...action,
+        action: "Add a clear conversion route, such as demo, signup, trial, or contact sales.",
+        whyItMatters:
+          "SaaS pages need an obvious next step for visitors evaluating the product."
+      };
+    }
+
+    if (cleanAction.includes("localbusiness schema")) {
+      return {
+        ...action,
+        action: "Review structured data for SaaS content, such as SoftwareApplication, Product, Organization, or FAQPage schema where relevant.",
+        whyItMatters:
+          "Structured data can clarify the product, organization, and support content; full SaaS scoring is still being developed."
+      };
+    }
+  }
+
+  if (mode === "blog-media") {
+    if (cleanAction.includes("phone number")) {
+      return {
+        ...action,
+        action: "Add a clear reader next step, such as newsletter signup, related articles, or a useful resource link.",
+        whyItMatters:
+          "Blog and media pages should guide readers toward deeper engagement after they finish the article."
+      };
+    }
+
+    if (cleanAction.includes("localbusiness schema")) {
+      return {
+        ...action,
+        action: "Review structured data for editorial content, such as Article, BlogPosting, BreadcrumbList, or FAQPage schema where relevant.",
+        whyItMatters:
+          "Editorial schema helps clarify article structure and context; full blog/media scoring is still being developed."
+      };
+    }
+  }
+
+  if (
+    cleanAction.includes("target location") ||
+    cleanAction.includes("local mentions") ||
+    cleanAction.includes("location-specific")
+  ) {
+    return {
+      ...action,
+      action: action.action
+        .replace(/target location/gi, "target topic")
+        .replace(/local mentions/gi, "topical mentions")
+        .replace(/location-specific/gi, "topic-specific"),
+      whyItMatters:
+        "This mode is in early support, so recommendations are adjusted lightly while full scoring is still being developed."
+    };
+  }
+
+  return action;
+}
+
 function includesAny(text: string, words: string[]): boolean {
   const cleanText = text.toLowerCase();
   return words.some((word) => cleanText.includes(word));
@@ -113,6 +207,7 @@ export function createPrioritizedActions(
   signals: ExtractedSignals
 ): PrioritizedAction[] {
   const actions: PrioritizedAction[] = [];
+  const intentMode = getIntentMode(input);
   const pageText = `${input.text ?? ""}\n${input.html ?? ""}`;
   const schemaSource = input.schemaJson ?? "";
   const hasFaqContent = includesAny(pageText, [
@@ -312,6 +407,11 @@ export function createPrioritizedActions(
   );
 
   return actions
+    .filter(
+      (action, index, allActions) =>
+        allActions.findIndex((item) => item.action === action.action) === index
+    )
+    .map((action) => adjustActionForIntentMode(action, intentMode))
     .filter(
       (action, index, allActions) =>
         allActions.findIndex((item) => item.action === action.action) === index

@@ -11,7 +11,7 @@ import type {
 } from "../lib/report/generate-report";
 import { generatePdfReport } from "../lib/report/generate-pdf-report";
 import { scoringConfig } from "../lib/scoring/config";
-import type { ScoreResult } from "../lib/scoring/types";
+import type { IntentMode, ScoreResult } from "../lib/scoring/types";
 
 type FetchedPageData = {
   title: string;
@@ -52,6 +52,7 @@ type ReportDetectedData = {
 };
 
 type FormState = {
+  intentMode: IntentMode;
   keyword: string;
   location: string;
   title: string;
@@ -68,6 +69,7 @@ type FormState = {
 };
 
 type TextFormField =
+  | "intentMode"
   | "keyword"
   | "location"
   | "title"
@@ -97,6 +99,7 @@ type CaseStudyState = {
 };
 
 const initialFormState: FormState = {
+  intentMode: "local-seo",
   keyword: "",
   location: "",
   title: "",
@@ -133,6 +136,7 @@ const blockedCompetitorDomains = [
 ];
 
 const exampleFormState: FormState = {
+  intentMode: "local-seo",
   keyword: "dentist london",
   location: "london",
   title: "",
@@ -165,7 +169,24 @@ const categoryLabels: Record<keyof ScoreResult["categoryScores"], string> = {
 const logoUrl =
   "https://cwccomputerrepairchard.com/wp-content/uploads/2024/02/CWC-Logo-image-1-e1777727757742.png";
 
-const topicKeywords = [
+const intentModeOptions: Array<{ label: string; value: IntentMode }> = [
+  { label: "Local SEO", value: "local-seo" },
+  { label: "Affiliate", value: "affiliate" },
+  { label: "SaaS", value: "saas" },
+  { label: "Blog / Media", value: "blog-media" }
+];
+
+const intentModeLabels: Record<IntentMode, string> = {
+  "local-seo": "Local SEO",
+  affiliate: "Affiliate",
+  saas: "SaaS",
+  "blog-media": "Blog / Media"
+};
+
+const modeNotice =
+  "This mode is in early support. Recommendations are adjusted lightly but full scoring is still being developed.";
+
+const localTopicKeywords = [
   "laptop repair",
   "computer repair",
   "pc repair",
@@ -182,6 +203,46 @@ const topicKeywords = [
   "remote support",
   "diagnostics"
 ];
+
+const intentTopicKeywords: Record<IntentMode, string[]> = {
+  "local-seo": localTopicKeywords,
+  affiliate: [
+    "best",
+    "review",
+    "comparison",
+    "alternatives",
+    "pricing",
+    "pros and cons",
+    "buyer guide",
+    "features",
+    "discount",
+    "deal"
+  ],
+  saas: [
+    "demo",
+    "trial",
+    "pricing",
+    "features",
+    "integrations",
+    "security",
+    "case study",
+    "customer",
+    "onboarding",
+    "support"
+  ],
+  "blog-media": [
+    "guide",
+    "how to",
+    "tips",
+    "news",
+    "analysis",
+    "resources",
+    "newsletter",
+    "related articles",
+    "editorial",
+    "explainer"
+  ]
+};
 
 const executionModes: Array<{
   description: string;
@@ -243,10 +304,14 @@ function getHeadingsCount(result: ScoreResult): number {
   );
 }
 
-function detectTopicsServices(text: string): string[] {
+function detectTopicsServices(
+  text: string,
+  intentMode: IntentMode = "local-seo"
+): string[] {
   const cleanText = text.toLowerCase();
+  const keywords = intentTopicKeywords[intentMode] ?? localTopicKeywords;
 
-  return topicKeywords.filter((topic) => cleanText.includes(topic));
+  return keywords.filter((topic) => cleanText.includes(topic));
 }
 
 function getBenchmarkGaps({
@@ -257,12 +322,13 @@ function getBenchmarkGaps({
 }: {
   competitor: ScoreResult;
   competitorText: string;
+  intentMode: IntentMode;
   targetResult: ScoreResult;
   targetText: string;
 }): string[] {
   const gaps = new Set<string>();
-  const targetTopics = detectTopicsServices(targetText);
-  const competitorTopics = detectTopicsServices(competitorText);
+  const targetTopics = detectTopicsServices(targetText, intentMode);
+  const competitorTopics = detectTopicsServices(competitorText, intentMode);
   const targetHeadingCount = getHeadingsCount(targetResult);
   const competitorHeadingCount = getHeadingsCount(competitor);
 
@@ -399,18 +465,22 @@ function getErrorReason(errorMessage: string): string {
 }
 
 function createLimitedBenchmarkResult({
+  intentMode,
   input,
   reason,
   snippetOnly = false,
   status = "inaccessible"
 }: {
+  intentMode: IntentMode;
   input: CompetitorInput;
   reason: string;
   snippetOnly?: boolean;
   status?: "inaccessible" | "limited";
 }): BenchmarkResult {
   const snippetText = [input.title, input.snippet].filter(Boolean).join(" ");
-  const snippetTopics = snippetOnly ? detectTopicsServices(snippetText) : [];
+  const snippetTopics = snippetOnly
+    ? detectTopicsServices(snippetText, intentMode)
+    : [];
 
   return {
     url: input.url,
@@ -556,10 +626,12 @@ function getTopRecommendedNextStep({
 
 function buildBenchmarkInsights({
   competitors,
+  intentMode,
   targetResult,
   targetText
 }: {
   competitors: BenchmarkCompetitor[];
+  intentMode: IntentMode;
   targetResult: ScoreResult;
   targetText: string;
 }): BenchmarkInsights | null {
@@ -572,7 +644,7 @@ function buildBenchmarkInsights({
     competitors.reduce((total, competitor) => total + competitor.wordCount, 0) /
       competitors.length
   );
-  const targetTopics = detectTopicsServices(targetText);
+  const targetTopics = detectTopicsServices(targetText, intentMode);
   const topicCounts = countValues(
     competitors.flatMap((competitor) => competitor.topicsServices)
   );
@@ -1209,7 +1281,7 @@ export default function Home() {
   const [isPdfExporting, setIsPdfExporting] = useState(false);
   const [logoFailed, setLogoFailed] = useState(false);
 
-  function updateField(field: TextFormField, value: string) {
+  function updateField<K extends TextFormField>(field: K, value: FormState[K]) {
     setForm((current) => ({
       ...current,
       [field]: value
@@ -1324,6 +1396,7 @@ export default function Home() {
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
+          intentMode: form.intentMode,
           keyword: form.keyword,
           location: form.location,
           title: form.title,
@@ -1361,6 +1434,7 @@ export default function Home() {
   ): Promise<BenchmarkResult> {
     if (isBlockedCompetitorDomain(input.url)) {
       return createLimitedBenchmarkResult({
+        intentMode: form.intentMode,
         input,
         reason: "blocked domain"
       });
@@ -1385,6 +1459,7 @@ export default function Home() {
           : "Competitor page could not be fetched.";
 
       return createLimitedBenchmarkResult({
+        intentMode: form.intentMode,
         input,
         reason: getErrorReason(errorMessage),
         snippetOnly: Boolean(input.title || input.snippet),
@@ -1397,6 +1472,7 @@ export default function Home() {
 
     if (!pageText || pageText.trim().length < 120) {
       return createLimitedBenchmarkResult({
+        intentMode: form.intentMode,
         input,
         reason: "empty content",
         snippetOnly: Boolean(input.title || input.snippet),
@@ -1410,6 +1486,7 @@ export default function Home() {
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
+        intentMode: form.intentMode,
         keyword: form.keyword,
         location: form.location,
         title: pageData.title,
@@ -1435,11 +1512,12 @@ export default function Home() {
       headingsCount: getHeadingsCount(competitorScore),
       schemaTypes: competitorScore.signals.schemaTypes,
       trustSignals: competitorScore.signals.trustSignals,
-      topicsServices: detectTopicsServices(pageText),
+      topicsServices: detectTopicsServices(pageText, form.intentMode),
       gapsFound: result
         ? getBenchmarkGaps({
             competitor: competitorScore,
             competitorText: pageText,
+            intentMode: form.intentMode,
             targetResult: result,
             targetText: form.pageContent
           })
@@ -1477,6 +1555,7 @@ export default function Home() {
             return await analyseCompetitorUrl(input);
           } catch (benchmarkError) {
             return createLimitedBenchmarkResult({
+              intentMode: form.intentMode,
               input,
               reason:
                 benchmarkError instanceof Error
@@ -1502,6 +1581,7 @@ export default function Home() {
 
     const report = generateDeveloperReport({
       page: {
+        intentMode: form.intentMode,
         keyword: form.keyword,
         location: form.location,
         url: form.websiteUrl,
@@ -1526,6 +1606,7 @@ export default function Home() {
 
     const taskPack = generateAiTaskPack({
       page: {
+        intentMode: form.intentMode,
         keyword: form.keyword,
         location: form.location,
         url: form.websiteUrl,
@@ -1578,6 +1659,7 @@ export default function Home() {
     result && completedBenchmarkResults.length >= 2
       ? buildBenchmarkInsights({
           competitors: completedBenchmarkResults,
+          intentMode: form.intentMode,
           targetResult: result,
           targetText: form.pageContent
         })
@@ -1649,6 +1731,23 @@ export default function Home() {
 
         <div className="form-grid">
           <label>
+            Intent mode
+            <select
+              name="intentMode"
+              onChange={(event) =>
+                updateField("intentMode", event.target.value as IntentMode)
+              }
+              value={form.intentMode}
+            >
+              {intentModeOptions.map((mode) => (
+                <option key={mode.value} value={mode.value}>
+                  {mode.label}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label>
             Target keyword
             <input
               name="keyword"
@@ -1712,6 +1811,12 @@ export default function Home() {
           Use a live service page URL, then review the extracted content before
           scoring.
         </p>
+
+        {form.intentMode !== "local-seo" ? (
+          <p className="warning-output">
+            {modeNotice}
+          </p>
+        ) : null}
 
         <label>
           Meta description
