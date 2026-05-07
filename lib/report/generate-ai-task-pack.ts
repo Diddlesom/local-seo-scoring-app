@@ -1590,9 +1590,11 @@ function isInternalLinkAction(action: PrioritizedAction | null): boolean {
 }
 
 function generateFastInternalLinkTaskPack({
-  page
+  page,
+  result
 }: {
   page: ReportPageDetails;
+  result: ScoreResult;
 }): string {
   const link = getInternalLinkRecommendations(page).highConfidence[0];
   const anchorText = link ? cleanText(link.text) : "No high-confidence link found.";
@@ -1646,7 +1648,7 @@ function generateFastAiTaskPack({
   const action = getHighestPriorityAction(result.prioritizedActions);
 
   if (isInternalLinkAction(action)) {
-    return generateFastInternalLinkTaskPack({ page });
+    return generateFastInternalLinkTaskPack({ page, result });
   }
 
   return [
