@@ -698,9 +698,7 @@ function getValidationSteps(
 
     return [
       "Click each new link and confirm it opens an existing page.",
-      executionMode === "fast"
-        ? "Confirm only the relevant page section was edited."
-        : "Confirm only relevant article or page sections were edited.",
+      "Confirm only relevant article or page sections were edited.",
       "Check the page still reads naturally."
     ];
   }
