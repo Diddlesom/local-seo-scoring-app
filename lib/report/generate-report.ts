@@ -1066,6 +1066,25 @@ function getTaskDetails(
 } {
   const cleanAction = action.action.toLowerCase();
   const location = getLocation(page);
+  const targetKeyword = page.keyword
+    ? cleanReportText(page.keyword)
+    : "Best Cordless Vacuum Cleaners";
+
+  if (
+    page.intentMode === "affiliate" &&
+    cleanAction.includes("page title")
+  ) {
+    return {
+      whereToImplement:
+        "SEO title field, page title, or article title setting.",
+      whatToChange:
+        "Rewrite the title so the buyer-intent topic is clear and useful. Keep it accurate to the products actually reviewed.",
+      example:
+        `Example title: Best ${targetKeyword.replace(/^best\s+/i, "")} Tested & Reviewed`,
+      expectedOutcome:
+        "Readers and search engines can quickly understand the affiliate review or buying-guide topic."
+    };
+  }
 
   if (cleanAction.includes("faqpage schema")) {
     if (page.faqQuestions.length === 0) {
@@ -1188,9 +1207,9 @@ function getTaskDetails(
       whereToImplement:
         "SEO plugin custom schema field, page head, or page-level JSON-LD injection area.",
       whatToChange:
-        "Add Product, Review, ItemList, or FAQPage schema only where it matches visible product, review, list, or FAQ content.",
+        "Add Product, Review, or ItemList schema where appropriate. Only add FAQPage schema if visible FAQs are added first.",
       example:
-        "Use Product schema for a single reviewed product, Review schema for real review content, ItemList schema for ranked roundups, and FAQPage schema only for visible FAQs.",
+        "Use Product schema for a single reviewed product, Review schema for real review content, and ItemList schema for ranked roundups. Do not add FAQPage schema unless visible FAQ questions and answers exist on the page.",
       expectedOutcome:
         "Structured data supports affiliate buyer content without using LocalBusiness or location schema."
     };
@@ -1346,6 +1365,30 @@ function formatTasks(
   ].join("\n\n");
 }
 
+function getDeveloperQaChecklist(mode?: IntentMode): string[] {
+  if (mode === "affiliate") {
+    return [
+      "- Run Google Rich Results Test",
+      "- Validate JSON-LD",
+      "- Check page still has one H1",
+      "- Check affiliate disclosure is visible before affiliate links",
+      "- Check product links work",
+      "- Check comparison table works on mobile",
+      "- Check Product, Review, or ItemList schema matches visible content",
+      "- Check FAQPage schema is only added when visible FAQs exist"
+    ];
+  }
+
+  return [
+    "- Run Google Rich Results Test",
+    "- Validate JSON-LD",
+    "- Check page still has one H1",
+    "- Check phone links still work",
+    "- Check page loads correctly on mobile",
+    "- Check no duplicate/conflicting LocalBusiness schema remains"
+  ];
+}
+
 export function generateDeveloperReport({
   page,
   result,
@@ -1388,11 +1431,6 @@ export function generateDeveloperReport({
     formatTasks(result.prioritizedActions, "low", page),
     "",
     "DEVELOPER QA CHECKLIST",
-    "- Run Google Rich Results Test",
-    "- Validate JSON-LD",
-    "- Check page still has one H1",
-    "- Check phone links still work",
-    "- Check page loads correctly on mobile",
-    "- Check no duplicate/conflicting LocalBusiness schema remains"
+    ...getDeveloperQaChecklist(page.intentMode)
   ].join("\n");
 }

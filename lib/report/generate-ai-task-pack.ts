@@ -762,6 +762,18 @@ function getWhereToImplement(action: PrioritizedAction, page: ReportPageDetails)
 
 function getCodeOrContent(action: PrioritizedAction, page: ReportPageDetails): string {
   const cleanAction = action.action.toLowerCase();
+  const targetKeyword = page.keyword ? cleanText(page.keyword) : "Cordless Vacuum Cleaners";
+
+  if (
+    page.intentMode === "affiliate" &&
+    cleanAction.includes("page title")
+  ) {
+    return [
+      "Use a buyer-intent title that includes the target keyword and the review/comparison promise.",
+      "",
+      `Example title: Best ${targetKeyword.replace(/^best\s+/i, "")} Tested & Reviewed`
+    ].join("\n");
+  }
 
   if (cleanAction.includes("faqpage schema")) {
     return getFaqJsonLd(page);
@@ -814,11 +826,11 @@ function getCodeOrContent(action: PrioritizedAction, page: ReportPageDetails): s
       cleanAction.includes("review schema"))
   ) {
     return [
-      "Add Product, Review, ItemList, or FAQPage schema only where it matches visible page content.",
+      "Add Product, Review, or ItemList schema where appropriate. Only add FAQPage schema if visible FAQs are added first.",
       "- Product: for a single reviewed product.",
       "- Review: for real review content.",
       "- ItemList: for ranked roundups.",
-      "- FAQPage: only for visible FAQs."
+      "- FAQPage: only when visible FAQ questions and answers exist on the page."
     ].join("\n");
   }
 

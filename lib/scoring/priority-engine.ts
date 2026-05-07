@@ -769,7 +769,7 @@ function createAffiliatePrioritizedActions(
         impact: 6,
         ease: 5,
         action:
-          "Add Product, Review, ItemList, or FAQPage schema where appropriate.",
+          "Add Product, Review, or ItemList schema where appropriate. Only add FAQPage schema if visible FAQs are added first.",
         whyItMatters:
           "Affiliate-friendly schema helps clarify products, reviews, lists, and FAQs without using local business markup."
       })
@@ -792,7 +792,7 @@ function createAffiliatePrioritizedActions(
       impact: 3,
       ease: 5,
       action:
-        "Affiliate scoring is in early support, so review recommendations against the actual business model before implementation.",
+        "Affiliate scoring is in early support, so review recommendations against the affiliate strategy and monetisation model before implementation.",
       whyItMatters:
         "The app now checks buyer-intent signals, but full Affiliate scoring is still being developed."
     })
