@@ -249,17 +249,28 @@ function countSchemaTypes(schemaSource: string): number {
 }
 
 const blogMediaInternalLinkTopics = [
+  "fix",
+  "slow",
+  "computer",
+  "pc",
   "ssd",
   "ssd upgrade",
   "malware",
   "malware removal",
+  "safe",
+  "common-problems",
+  "remotely",
   "overheating",
   "slow startup",
   "slow boot",
   "startup programs",
   "browser performance",
   "browser tabs",
+  "guide",
+  "windows",
   "remote repair",
+  "remote",
+  "repair",
   "troubleshooting",
   "checklist",
   "windows update",
@@ -292,6 +303,49 @@ function classifyBlogMediaInternalLink(url: string): "editorial" | "weak" {
   return "weak";
 }
 
+function isWeakBlogMediaInternalUrl(url: string): boolean {
+  try {
+    return /(location|areas-we-cover|near-me|chard|ilminster|somerset|yeovil|taunton)/.test(
+      new URL(url).pathname.toLowerCase()
+    );
+  } catch {
+    return false;
+  }
+}
+
+function extractInternalLinksFromHtml(
+  websiteUrl?: string,
+  html?: string
+): Array<{ text: string; url: string }> {
+  if (!websiteUrl || !html) {
+    return [];
+  }
+
+  try {
+    const baseUrl = new URL(websiteUrl);
+    const links: Array<{ text: string; url: string }> = [];
+    const linkPattern = /<a\b[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi;
+    let match = linkPattern.exec(html);
+
+    while (match) {
+      const resolvedUrl = new URL(match[1], baseUrl);
+
+      if (resolvedUrl.hostname === baseUrl.hostname) {
+        links.push({
+          text: match[2].replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim(),
+          url: resolvedUrl.toString()
+        });
+      }
+
+      match = linkPattern.exec(html);
+    }
+
+    return links;
+  } catch {
+    return [];
+  }
+}
+
 function hasRelevantBlogMediaInternalLinks(
   links?: ScoringInput["relatedInternalLinks"]
 ): boolean {
@@ -299,14 +353,20 @@ function hasRelevantBlogMediaInternalLinks(
     return false;
   }
 
-  return links.some((link) => {
+  const relevantLinks = links.filter((link) => {
     const comparable = `${link.text} ${link.url}`.toLowerCase();
     const hasTopicMatch = blogMediaInternalLinkTopics.some((topic) =>
       comparable.includes(topic)
     );
 
-    return hasTopicMatch && classifyBlogMediaInternalLink(link.url) === "editorial";
+    return (
+      hasTopicMatch &&
+      (classifyBlogMediaInternalLink(link.url) === "editorial" ||
+        !isWeakBlogMediaInternalUrl(link.url))
+    );
   });
+
+  return relevantLinks.length >= 2;
 }
 
 function createBlogMediaPrioritizedActions(
@@ -315,9 +375,12 @@ function createBlogMediaPrioritizedActions(
 ): PrioritizedAction[] {
   const actions: PrioritizedAction[] = [];
   const pageText = `${input.text ?? ""}\n${input.html ?? ""}`;
+  const detectedInternalLinks = [
+    ...(input.relatedInternalLinks ?? []),
+    ...extractInternalLinksFromHtml(input.websiteUrl, input.html)
+  ];
   const hasInternalLinks =
-    hasRelevantBlogMediaInternalLinks(input.relatedInternalLinks) ||
-    /href=["'][^"']+/i.test(input.html ?? "") ||
+    hasRelevantBlogMediaInternalLinks(detectedInternalLinks) ||
     /\brelated (?:articles|content|guides|resources)\b/i.test(pageText);
   const hasFaqCoverage = signals.trustSignals.includes("FAQ coverage");
   const hasExamples = signals.trustSignals.includes(

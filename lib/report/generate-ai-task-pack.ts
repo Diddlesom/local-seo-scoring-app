@@ -192,17 +192,29 @@ const serviceTopics = [
 ];
 
 const blogMediaInternalTopics = [
+  "fix",
+  "slow",
+  "computer",
+  "pc",
   "ssd upgrade",
   "ssd upgrades",
   "malware removal",
   "malware",
+  "safe",
+  "common problems",
+  "common-problems",
+  "remotely",
   "overheating",
   "slow startup",
   "slow boot",
   "startup programs",
   "browser performance",
   "browser tabs",
+  "guide",
+  "windows",
   "remote repair",
+  "remote",
+  "repair",
   "troubleshooting",
   "checklist",
   "windows updates",
@@ -421,7 +433,7 @@ function hasRelevantEditorialInternalLinks(
 ): boolean {
   return (
     recommendations.highConfidence.length + recommendations.mediumConfidence.length >=
-    1
+    2
   );
 }
 

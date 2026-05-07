@@ -97,6 +97,89 @@ function includesPhrase(text: string, phrase?: string): boolean {
   return false;
 }
 
+function normaliseBlogMediaToken(
+  token: string,
+  hasPerformanceContext: boolean
+): string {
+  if (token === "pc" || token === "computer") {
+    return "computer";
+  }
+
+  if (token === "laptop" && hasPerformanceContext) {
+    return "computer";
+  }
+
+  if (
+    token === "sluggish" ||
+    token === "laggy" ||
+    token === "lagging" ||
+    token === "performance"
+  ) {
+    return "slow";
+  }
+
+  if (token === "fixes" || token === "fixing") {
+    return "fix";
+  }
+
+  return token;
+}
+
+function getBlogMediaTopicTokens(text: string): string[] {
+  const cleanText = normaliseForMatching(text);
+  const rawTokens = cleanText.split(" ").filter(Boolean);
+  const hasPerformanceContext =
+    /\b(slow|sluggish|laggy|lagging|performance|speed|boot|startup|troubleshoot|troubleshooting|fix|fixes|problem|problems)\b/i.test(
+      cleanText
+    );
+  const weakTokens = new Set([
+    "a",
+    "an",
+    "and",
+    "are",
+    "common",
+    "does",
+    "how",
+    "is",
+    "my",
+    "of",
+    "so",
+    "the",
+    "to",
+    "what",
+    "why",
+    "your"
+  ]);
+
+  return Array.from(
+    new Set(
+      rawTokens
+        .map((token) => normaliseBlogMediaToken(token, hasPerformanceContext))
+        .filter((token) => token.length > 1 && !weakTokens.has(token))
+    )
+  );
+}
+
+function includesBlogMediaSemanticPhrase(text: string, phrase?: string): boolean {
+  const phraseTokens = getBlogMediaTopicTokens(phrase ?? "");
+  const textTokens = new Set(getBlogMediaTopicTokens(text));
+
+  if (phraseTokens.length === 0 || textTokens.size === 0) {
+    return false;
+  }
+
+  const matchedTokens = phraseTokens.filter((token) => textTokens.has(token));
+  const hasDeviceMatch =
+    phraseTokens.includes("computer") && textTokens.has("computer");
+  const hasPerformanceMatch = phraseTokens.includes("slow") && textTokens.has("slow");
+
+  if (hasDeviceMatch && hasPerformanceMatch) {
+    return true;
+  }
+
+  return matchedTokens.length >= Math.min(2, phraseTokens.length);
+}
+
 function countPhrase(text: string, phrase?: string): number {
   const cleanPhrase = normalise(phrase);
 
@@ -338,7 +421,10 @@ export function extractSignals(input: ScoringInput): ExtractedSignals {
   const schemaTypes = findSchemaTypes(schemaSource);
   const locationMentionCount = countPhrase(pageText, input.location);
   const hasPhoneNumber = findPhoneNumber(pageText);
-  const titleKeywordMatch = includesPhrase(title, input.keyword);
+  const titleKeywordMatch =
+    intentMode === "blog-media"
+      ? includesBlogMediaSemanticPhrase(title, input.keyword)
+      : includesPhrase(title, input.keyword);
   const metaDescriptionKeywordMatch = includesPhrase(
     metaDescription,
     input.keyword
