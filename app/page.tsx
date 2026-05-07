@@ -596,26 +596,37 @@ function getRelativeGap(targetValue: number, averageValue: number): number {
 
 function getTopRecommendedNextStep({
   contentGap,
+  intentMode,
   trustGap,
   serviceGap,
   averageWordCount
 }: {
   contentGap: number;
+  intentMode: IntentMode;
   trustGap: number;
   serviceGap: number;
   averageWordCount: number;
 }): string {
+  const trustAction =
+    intentMode === "blog-media"
+      ? "Improve editorial trust with author expertise, first-hand experience, freshness signals, citations, or related resources."
+      : "Improve trust signals with visible reviews, testimonials, guarantees, or named expert proof.";
+  const topicAction =
+    intentMode === "blog-media"
+      ? "Expand informational coverage with semantic depth, troubleshooting detail, and PAA-style questions."
+      : "Expand service coverage for important services competitors mention but your page does not.";
+
   const gaps = [
     {
       action: `Increase content depth toward the competitor average of ${averageWordCount} words.`,
       gap: contentGap
     },
     {
-      action: "Improve trust signals with visible reviews, testimonials, guarantees, or named expert proof.",
+      action: trustAction,
       gap: trustGap
     },
     {
-      action: "Expand service coverage for important services competitors mention but your page does not.",
+      action: topicAction,
       gap: serviceGap
     }
   ].sort((first, second) => second.gap - first.gap);
@@ -739,24 +750,47 @@ function buildBenchmarkInsights({
         ? [
             `Your page: ${targetResult.signals.wordCount} words`,
             `Competitor average: ${averageWordCount} words`,
-            "Add more service detail and local relevance"
+            intentMode === "blog-media"
+              ? "Add more semantic depth, examples, and practical editorial detail"
+              : "Add more service detail and local relevance"
           ]
         : [],
-    trustSignals: [
-      "Add testimonials (used by competitors)",
-      "Add customer-style review wording",
-      "Add independent business messaging",
-      "Add family-run or guarantee messaging if accurate"
-    ],
-    serviceCoverage: [
-      "Add a computer repair section",
-      "Add a pc repair section",
-      "Consider mac repair and SSD upgrade if relevant"
-    ],
-    pageStructure: [
-      "Add more service subheadings",
-      "Break content into clearer sections"
-    ]
+    trustSignals:
+      intentMode === "blog-media"
+        ? [
+            "Add author expertise or reviewer details",
+            "Add first-hand experience wording where accurate",
+            "Add freshness/date signals",
+            "Add citations or supporting resources"
+          ]
+        : [
+            "Add testimonials (used by competitors)",
+            "Add customer-style review wording",
+            "Add independent business messaging",
+            "Add family-run or guarantee messaging if accurate"
+          ],
+    serviceCoverage:
+      intentMode === "blog-media"
+        ? [
+            "Improve semantic breadth around the main topic",
+            "Expand troubleshooting sections",
+            "Add PAA-style questions and answers"
+          ]
+        : [
+            "Add a computer repair section",
+            "Add a pc repair section",
+            "Consider mac repair and SSD upgrade if relevant"
+          ],
+    pageStructure:
+      intentMode === "blog-media"
+        ? [
+            "Add examples, checklists, or comparison tables",
+            "Improve media richness with useful screenshots, diagrams, or video"
+          ]
+        : [
+            "Add more service subheadings",
+            "Break content into clearer sections"
+          ]
   };
   const priorityActions = [
     ...priorityActionGroups.contentDepth,
@@ -766,6 +800,7 @@ function buildBenchmarkInsights({
   ];
 
   return {
+    intentMode,
     targetWordCount: targetResult.signals.wordCount,
     averageWordCount,
     overallCompetitivePosition: [
@@ -776,8 +811,12 @@ function buildBenchmarkInsights({
         ? "Trust signals are below the competitor average."
         : "Trust signals are competitive against the current benchmark.",
       serviceGap > 0
-        ? "Service coverage is below the competitor average."
-        : "Service coverage is competitive against the current benchmark.",
+        ? intentMode === "blog-media"
+          ? "Topic coverage is below the competitor average."
+          : "Service coverage is below the competitor average."
+        : intentMode === "blog-media"
+          ? "Topic coverage is competitive against the current benchmark."
+          : "Service coverage is competitive against the current benchmark.",
       belowAverageAreas.length > 0
         ? `Summary: your page is behind competitors on ${belowAverageAreas.join(", ")}.`
         : "Summary: your page is broadly competitive against the current competitor set."
@@ -848,6 +887,7 @@ function buildBenchmarkInsights({
     keyGaps,
     topRecommendedNextStep: getTopRecommendedNextStep({
       contentGap,
+      intentMode,
       trustGap,
       serviceGap,
       averageWordCount
@@ -881,7 +921,13 @@ function formatIssueText(issue: string): string {
   return issue;
 }
 
-function TopIssues({ result }: { result: ScoreResult }) {
+function TopIssues({
+  intentMode,
+  result
+}: {
+  intentMode: IntentMode;
+  result: ScoreResult;
+}) {
   const issues =
     result.weaknesses.length > 0
       ? result.weaknesses.slice(0, 3)
@@ -912,8 +958,10 @@ function TopIssues({ result }: { result: ScoreResult }) {
         </p>
       )}
       <p className="why-this-matters">
-        Why this matters: Pages with stronger content depth, trust signals, and
-        internal linking tend to perform better for local service searches.
+        Why this matters:{" "}
+        {intentMode === "blog-media"
+          ? "Pages with stronger semantic depth, editorial trust signals, and related internal links tend to perform better for informational searches."
+          : "Pages with stronger content depth, trust signals, and internal linking tend to perform better for local service searches."}
       </p>
       <a className="guided-link" href="#recommended-actions">
         View recommended fixes →
@@ -924,25 +972,31 @@ function TopIssues({ result }: { result: ScoreResult }) {
 
 function CategoryScoreBar({
   category,
+  intentMode,
   score
 }: {
   category: keyof ScoreResult["categoryScores"];
+  intentMode: IntentMode;
   score: number;
 }) {
   const maxScore = scoringConfig.categoryWeights[category];
   const percentage = Math.min(Math.round((score / maxScore) * 100), 100);
+  const categoryLabel =
+    intentMode === "blog-media" && category === "localSignals"
+      ? "Topic coverage"
+      : categoryLabels[category];
 
   return (
     <div className="score-bar-row">
       <div className="score-bar-label">
-        <span>{categoryLabels[category]}</span>
+        <span>{categoryLabel}</span>
         <strong>
           {score}
           <small> / {maxScore}</small>
         </strong>
       </div>
       <div
-        aria-label={`${categoryLabels[category]} score ${score} out of ${maxScore}`}
+        aria-label={`${categoryLabel} score ${score} out of ${maxScore}`}
         className="score-bar-track"
         role="progressbar"
         aria-valuemin={0}
@@ -1002,10 +1056,14 @@ function BenchmarkInsightsPanel({
 }: {
   insights: BenchmarkInsights;
 }) {
+  const isBlogMedia = insights.intentMode === "blog-media";
   const actionGroups = [
     ["Increase content depth", insights.priorityActionGroups.contentDepth],
     ["Improve trust signals", insights.priorityActionGroups.trustSignals],
-    ["Expand service coverage", insights.priorityActionGroups.serviceCoverage],
+    [
+      isBlogMedia ? "Expand topic coverage" : "Expand service coverage",
+      insights.priorityActionGroups.serviceCoverage
+    ],
     ["Improve page structure", insights.priorityActionGroups.pageStructure]
   ] as const;
 
@@ -1029,7 +1087,7 @@ function BenchmarkInsightsPanel({
             {insights.overallPositionSections.trustSignals}
           </p>
           <p>
-            <strong>Service coverage</strong>
+            <strong>{isBlogMedia ? "Topic coverage" : "Service coverage"}</strong>
             {insights.overallPositionSections.serviceCoverage}
           </p>
           <p>
@@ -2140,7 +2198,7 @@ export default function Home() {
             </div>
           </div>
 
-          <TopIssues result={result} />
+          <TopIssues intentMode={form.intentMode} result={result} />
 
           <section className="panel card">
             <div className="card-heading">
@@ -2153,6 +2211,7 @@ export default function Home() {
               {Object.entries(result.categoryScores).map(([key, score]) => (
                 <CategoryScoreBar
                   category={key as keyof ScoreResult["categoryScores"]}
+                  intentMode={form.intentMode}
                   key={key}
                   score={score}
                 />

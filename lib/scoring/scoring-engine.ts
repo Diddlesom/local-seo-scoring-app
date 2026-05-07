@@ -3,7 +3,12 @@ import {
   createPrioritizedActions,
   createPriorityActions
 } from "./priority-engine";
-import type { CategoryScores, ScoreResult, ScoringInput } from "./types";
+import type {
+  CategoryScores,
+  IntentMode,
+  ScoreResult,
+  ScoringInput
+} from "./types";
 
 function getGrade(totalScore: number): ScoreResult["grade"] {
   if (totalScore >= 85) {
@@ -50,9 +55,36 @@ function createCategoryScores(
   };
 }
 
+function getIntentMode(input: ScoringInput): IntentMode {
+  return input.intentMode ?? "local-seo";
+}
+
+function createBlogMediaCategoryScores(
+  signals: ReturnType<typeof extractSignals>
+): CategoryScores {
+  return {
+    content: signals.wordCount >= 900 ? 15 : signals.wordCount >= 500 ? 10 : 5,
+    headings:
+      signals.headings.h1.length > 0 &&
+      signals.headings.h2.length + signals.headings.h3.length >= 3
+        ? 15
+        : signals.headings.h1.length > 0
+          ? 10
+          : 0,
+    metadata:
+      (signals.titleKeywordMatch ? 10 : 0) +
+      (signals.metaDescriptionKeywordMatch ? 10 : 0),
+    localSignals: Math.min(signals.topicSignals.length * 4, 15),
+    trust: Math.min(signals.trustSignals.length * 2, 10),
+    conversion: Math.min(signals.ctaWords.length * 3, 10),
+    schema: Math.min(signals.schemaTypes.length * 5, 15)
+  };
+}
+
 function createStrengths(
   signals: ReturnType<typeof extractSignals>,
-  categoryScores: CategoryScores
+  categoryScores: CategoryScores,
+  intentMode: IntentMode = "local-seo"
 ): string[] {
   const strengths: string[] = [];
 
@@ -66,6 +98,26 @@ function createStrengths(
 
   if (signals.titleKeywordMatch) {
     strengths.push("Page title includes the target keyword.");
+  }
+
+  if (intentMode === "blog-media") {
+    if (signals.topicSignals.length > 0) {
+      strengths.push(
+        `Page includes Blog/Media topic signals: ${signals.topicSignals.join(", ")}.`
+      );
+    }
+
+    if (signals.trustSignals.length > 0) {
+      strengths.push(
+        `Page includes Blog/Media trust signals: ${signals.trustSignals.join(", ")}.`
+      );
+    }
+
+    if (signals.schemaTypes.length > 0) {
+      strengths.push("Page includes supported schema markup.");
+    }
+
+    return strengths;
   }
 
   if (signals.locationMentionCount > 0) {
@@ -95,7 +147,8 @@ function createStrengths(
 
 function createWeaknesses(
   signals: ReturnType<typeof extractSignals>,
-  categoryScores: CategoryScores
+  categoryScores: CategoryScores,
+  intentMode: IntentMode = "local-seo"
 ): string[] {
   const weaknesses: string[] = [];
 
@@ -113,6 +166,30 @@ function createWeaknesses(
 
   if (!signals.metaDescriptionKeywordMatch) {
     weaknesses.push("Meta description does not include the target keyword.");
+  }
+
+  if (intentMode === "blog-media") {
+    if (signals.topicSignals.length < 2) {
+      weaknesses.push(
+        "Blog/Media topic coverage is light for informational intent."
+      );
+    }
+
+    if (signals.trustSignals.length < 3) {
+      weaknesses.push(
+        "Blog/Media trust signals are limited."
+      );
+    }
+
+    if (signals.ctaWords.length === 0) {
+      weaknesses.push("No clear reader next-step wording was found.");
+    }
+
+    if (signals.schemaTypes.length === 0) {
+      weaknesses.push("No supported schema markup was found.");
+    }
+
+    return weaknesses;
   }
 
   if (!signals.metaDescriptionLocationMatch) {
@@ -143,10 +220,14 @@ function createWeaknesses(
 }
 
 export function scoreLocalSeo(input: ScoringInput): ScoreResult {
+  const intentMode = getIntentMode(input);
   const signals = extractSignals(input);
-  const actions = createPriorityActions(signals);
+  const actions = createPriorityActions(input, signals);
   const prioritizedActions = createPrioritizedActions(input, signals);
-  const categoryScores = createCategoryScores(signals);
+  const categoryScores =
+    intentMode === "blog-media"
+      ? createBlogMediaCategoryScores(signals)
+      : createCategoryScores(signals);
   const totalScore = Object.values(categoryScores).reduce(
     (total, score) => total + score,
     0
@@ -156,8 +237,8 @@ export function scoreLocalSeo(input: ScoringInput): ScoreResult {
     categoryScores,
     totalScore,
     grade: getGrade(totalScore),
-    strengths: createStrengths(signals, categoryScores),
-    weaknesses: createWeaknesses(signals, categoryScores),
+    strengths: createStrengths(signals, categoryScores, intentMode),
+    weaknesses: createWeaknesses(signals, categoryScores, intentMode),
     missingItems: actions.map((action) => action.title),
     prioritizedActions,
     evidenceItems: signals.evidence,

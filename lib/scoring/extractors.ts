@@ -1,4 +1,4 @@
-import type { ExtractedSignals, ScoringInput } from "./types";
+import type { ExtractedSignals, IntentMode, ScoringInput } from "./types";
 import { scoringConfig } from "./config";
 
 const flexibleStopWords = new Set(["in", "near", "for", "the", "a", "an"]);
@@ -198,6 +198,118 @@ function findTrustSignals(text: string): string[] {
   return Array.from(signals);
 }
 
+function findBlogMediaTrustSignals(
+  text: string,
+  headings: ExtractedSignals["headings"]
+): string[] {
+  const cleanText = normalise(text);
+  const signals = new Set<string>();
+
+  if (
+    /\b(?:by|author|written by|reviewed by|edited by)\s+[A-Z][a-z]+/i.test(
+      text
+    ) ||
+    /\b(?:expert|specialist|editor|journalist|researcher|credentials?|bio)\b/i.test(
+      text
+    )
+  ) {
+    signals.add("Author expertise");
+  }
+
+  if (
+    /\b(?:i|we|our team)\s+(?:tested|tried|used|found|compared|reviewed)\b/i.test(
+      text
+    ) ||
+    /\b(?:hands-on|first-hand|in our testing|from experience)\b/i.test(text)
+  ) {
+    signals.add("First-hand experience wording");
+  }
+
+  if (
+    /\b(?:published|updated|last updated|reviewed)\b/i.test(text) ||
+    /\b(?:20[2-9]\d|jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\b/i.test(
+      text
+    )
+  ) {
+    signals.add("Freshness/date signals");
+  }
+
+  if (
+    /\b(?:faq|frequently asked questions|questions and answers)\b/i.test(
+      text
+    ) ||
+    [...headings.h2, ...headings.h3].some((heading) => /\?/.test(heading))
+  ) {
+    signals.add("FAQ coverage");
+  }
+
+  if (
+    /\b(?:example|for example|tutorial|step-by-step|checklist|table|template|walkthrough)\b/i.test(
+      text
+    )
+  ) {
+    signals.add("Examples/tutorial style content");
+  }
+
+  if (
+    /\b(?:source|sources|citation|citations|references|resources|according to|study|research)\b/i.test(
+      text
+    ) ||
+    /href=["']https?:\/\//i.test(text)
+  ) {
+    signals.add("Citations/resources");
+  }
+
+  if (/href=["'][^"']+/i.test(text) || cleanText.includes("related articles")) {
+    signals.add("Internal links to related content");
+  }
+
+  return Array.from(signals);
+}
+
+function findBlogMediaTopicSignals(
+  text: string,
+  headings: ExtractedSignals["headings"]
+): string[] {
+  const cleanText = normalise(text);
+  const signals = new Set<string>();
+  const allHeadings = [...headings.h1, ...headings.h2, ...headings.h3].join(" ");
+
+  if (
+    headings.h2.length + headings.h3.length >= 4 ||
+    /\b(?:also|related|compare|alternatives|benefits|drawbacks|types|causes|options)\b/i.test(
+      text
+    )
+  ) {
+    signals.add("Semantic breadth");
+  }
+
+  if (
+    /\b(?:troubleshoot|troubleshooting|problem|issue|error|fix|solve|solution|why|how to)\b/i.test(
+      text
+    )
+  ) {
+    signals.add("Troubleshooting coverage");
+  }
+
+  if (
+    /\b(?:what is|how to|why does|guide|explained|learn|tips|steps|tutorial)\b/i.test(
+      `${text} ${allHeadings}`
+    )
+  ) {
+    signals.add("Informational intent alignment");
+  }
+
+  if (
+    /\?/.test(`${text} ${allHeadings}`) ||
+    /\b(?:people also ask|frequently asked|faq|questions)\b/i.test(text)
+  ) {
+    signals.add("PAA-style question coverage");
+  }
+
+  return Array.from(signals);
+}
+
 function findSchemaTypes(schemaSource: string): string[] {
   return scoringConfig.schemaTypes.filter((type) =>
     new RegExp(`"@type"\\s*:\\s*"[^"]*${type}[^"]*"`, "i").test(
@@ -207,12 +319,21 @@ function findSchemaTypes(schemaSource: string): string[] {
 }
 
 export function extractSignals(input: ScoringInput): ExtractedSignals {
+  const intentMode: IntentMode = input.intentMode ?? "local-seo";
   const html = input.html ?? "";
   const schemaSource = `${html}\n${input.schemaJson ?? ""}`;
   const pageText = input.text ?? stripHtml(html);
   const title = input.title ?? "";
   const metaDescription = input.metaDescription ?? "";
-  const trustSignals = findTrustSignals(pageText);
+  const headings = normaliseHeadings(input.headings, html);
+  const trustSignals =
+    intentMode === "blog-media"
+      ? findBlogMediaTrustSignals(`${pageText}\n${html}`, headings)
+      : findTrustSignals(pageText);
+  const topicSignals =
+    intentMode === "blog-media"
+      ? findBlogMediaTopicSignals(pageText, headings)
+      : [];
   const ctaWords = findMatches(pageText, scoringConfig.ctaWords);
   const schemaTypes = findSchemaTypes(schemaSource);
   const locationMentionCount = countPhrase(pageText, input.location);
@@ -227,7 +348,6 @@ export function extractSignals(input: ScoringInput): ExtractedSignals {
     input.location
   );
   const wordCount = countWords(pageText);
-  const headings = normaliseHeadings(input.headings, html);
   const evidence = [
     `Word count: ${wordCount}`,
     `Headings found: ${headings.h1.length} H1, ${headings.h2.length} H2, ${headings.h3.length} H3`,
@@ -235,7 +355,16 @@ export function extractSignals(input: ScoringInput): ExtractedSignals {
     hasPhoneNumber ? "Phone number detected" : "No phone number detected",
     trustSignals.length > 0
       ? `Trust signals: ${trustSignals.join(", ")}`
-      : "No basic trust signals detected",
+      : intentMode === "blog-media"
+        ? "No Blog/Media trust signals detected"
+        : "No basic trust signals detected",
+    ...(intentMode === "blog-media"
+      ? [
+          topicSignals.length > 0
+            ? `Topic signals: ${topicSignals.join(", ")}`
+            : "No Blog/Media topic signals detected"
+        ]
+      : []),
     ctaWords.length > 0
       ? `CTA words: ${ctaWords.join(", ")}`
       : "No CTA words detected",
@@ -253,6 +382,7 @@ export function extractSignals(input: ScoringInput): ExtractedSignals {
     locationMentionCount,
     hasPhoneNumber,
     trustSignals,
+    topicSignals,
     ctaWords,
     schemaTypes,
     evidence

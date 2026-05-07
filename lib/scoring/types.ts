@@ -31,6 +31,7 @@ export type ExtractedSignals = {
   locationMentionCount: number;
   hasPhoneNumber: boolean;
   trustSignals: string[];
+  topicSignals: string[];
   ctaWords: string[];
   schemaTypes: string[];
   evidence: string[];

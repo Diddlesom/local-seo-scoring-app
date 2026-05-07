@@ -787,7 +787,7 @@ function formatBenchmarkInsightsContext(
     "Overall competitive position:",
     `- Content depth: ${cleanText(insights.overallPositionSections.contentDepth)}`,
     `- Trust signals: ${cleanText(insights.overallPositionSections.trustSignals)}`,
-    `- Service coverage: ${cleanText(insights.overallPositionSections.serviceCoverage)}`,
+    `- ${insights.intentMode === "blog-media" ? "Topic coverage" : "Service coverage"}: ${cleanText(insights.overallPositionSections.serviceCoverage)}`,
     `- Summary: ${cleanText(insights.overallPositionSections.summary)}`,
     "",
     "Content depth comparison:",
@@ -809,6 +809,7 @@ function formatBenchmarkInsightsContext(
 }
 
 function formatBenchmarkActionGroups(insights: BenchmarkInsights): string[] {
+  const isBlogMedia = insights.intentMode === "blog-media";
   const groups: Array<{ title: string; items: string[] }> = [];
 
   if (insights.targetWordCount < insights.averageWordCount) {
@@ -817,7 +818,9 @@ function formatBenchmarkActionGroups(insights: BenchmarkInsights): string[] {
       items: [
         `Your page: ${insights.targetWordCount} words`,
         `Competitor average: ${insights.averageWordCount} words`,
-        "Add more service detail and local relevance"
+        isBlogMedia
+          ? "Add more semantic depth, examples, and practical editorial detail"
+          : "Add more service detail and local relevance"
       ]
     });
   }
@@ -825,27 +828,15 @@ function formatBenchmarkActionGroups(insights: BenchmarkInsights): string[] {
   groups.push(
     {
       title: "Improve trust signals",
-      items: [
-        "Add testimonials (used by competitors)",
-        "Add customer-style review wording",
-        "Add independent business messaging",
-        "Add family-run or guarantee messaging if accurate"
-      ]
+      items: insights.priorityActionGroups.trustSignals
     },
     {
-      title: "Expand service coverage",
-      items: [
-        "Add a computer repair section",
-        "Add a pc repair section",
-        "Consider mac repair and SSD upgrade if relevant"
-      ]
+      title: isBlogMedia ? "Expand topic coverage" : "Expand service coverage",
+      items: insights.priorityActionGroups.serviceCoverage
     },
     {
       title: "Improve page structure",
-      items: [
-        "Add more service subheadings",
-        "Break content into clearer sections"
-      ]
+      items: insights.priorityActionGroups.pageStructure
     }
   );
 

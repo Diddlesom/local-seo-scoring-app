@@ -7,9 +7,55 @@ import type {
 } from "./types";
 
 export function createPriorityActions(
+  input: ScoringInput,
   signals: ExtractedSignals
 ): PriorityAction[] {
+  const intentMode = getIntentMode(input);
   const actions: PriorityAction[] = [];
+
+  if (intentMode === "blog-media") {
+    if (!signals.titleKeywordMatch) {
+      actions.push({
+        id: "add-topic-to-title",
+        title: "Make the target topic clear in the page title",
+        priority: "high"
+      });
+    }
+
+    if (!signals.metaDescriptionKeywordMatch) {
+      actions.push({
+        id: "add-topic-to-meta-description",
+        title: "Make the target topic clear in the meta description",
+        priority: "medium"
+      });
+    }
+
+    if (!signals.topicSignals.includes("PAA-style question coverage")) {
+      actions.push({
+        id: "add-paa-style-questions",
+        title: "Add PAA-style questions or FAQs",
+        priority: "medium"
+      });
+    }
+
+    if (!signals.topicSignals.includes("Semantic breadth")) {
+      actions.push({
+        id: "improve-semantic-depth",
+        title: "Improve semantic depth around the main topic",
+        priority: "high"
+      });
+    }
+
+    if (!signals.topicSignals.includes("Troubleshooting coverage")) {
+      actions.push({
+        id: "expand-troubleshooting",
+        title: "Expand troubleshooting coverage",
+        priority: "medium"
+      });
+    }
+
+    return actions;
+  }
 
   if (!signals.titleKeywordMatch) {
     actions.push({
@@ -202,12 +248,134 @@ function countSchemaTypes(schemaSource: string): number {
   return schemaSource.match(/"@type"\s*:/gi)?.length ?? 0;
 }
 
+function createBlogMediaPrioritizedActions(
+  input: ScoringInput,
+  signals: ExtractedSignals
+): PrioritizedAction[] {
+  const actions: PrioritizedAction[] = [];
+  const pageText = `${input.text ?? ""}\n${input.html ?? ""}`;
+  const hasInternalLinks =
+    /href=["'][^"']+/i.test(input.html ?? "") ||
+    /\brelated (?:articles|content|guides|resources)\b/i.test(pageText);
+  const hasFaqCoverage = signals.trustSignals.includes("FAQ coverage");
+  const hasExamples = signals.trustSignals.includes(
+    "Examples/tutorial style content"
+  );
+  const hasCitations = signals.trustSignals.includes("Citations/resources");
+
+  if (!signals.titleKeywordMatch) {
+    actions.push(
+      createAction({
+        impact: 8,
+        ease: 8,
+        action: "Make the target topic clear in the page title.",
+        whyItMatters:
+          "Blog and media pages need a clear topic promise so readers and search engines understand the article quickly."
+      })
+    );
+  }
+
+  if (!hasFaqCoverage) {
+    actions.push(
+      createAction({
+        impact: 7,
+        ease: 7,
+        action: "Add FAQs or PAA-style questions that match reader search intent.",
+        whyItMatters:
+          "Question-led sections improve informational intent coverage and help the article answer follow-up searches."
+      })
+    );
+  }
+
+  if (!signals.topicSignals.includes("Semantic breadth")) {
+    actions.push(
+      createAction({
+        impact: 7,
+        ease: 6,
+        action: "Improve semantic depth with related subtopics, comparisons, causes, options, and definitions.",
+        whyItMatters:
+          "Semantic breadth helps informational content cover the topic more completely without relying on repetition."
+      })
+    );
+  }
+
+  if (!signals.topicSignals.includes("Troubleshooting coverage")) {
+    actions.push(
+      createAction({
+        impact: 6,
+        ease: 6,
+        action: "Expand troubleshooting sections with clear problems, causes, fixes, and next steps.",
+        whyItMatters:
+          "Troubleshooting coverage helps the page satisfy practical informational searches."
+      })
+    );
+  }
+
+  if (!hasInternalLinks) {
+    actions.push(
+      createAction({
+        impact: 6,
+        ease: 6,
+        action: "Add supporting internal links to related articles, guides, or resources.",
+        whyItMatters:
+          "Related internal links help readers continue learning and help search engines understand editorial topic clusters."
+      })
+    );
+  }
+
+  if (!hasExamples) {
+    actions.push(
+      createAction({
+        impact: 5,
+        ease: 6,
+        action: "Add examples, checklists, comparison tables, or step-by-step tutorial sections.",
+        whyItMatters:
+          "Concrete examples and structured formats make informational content easier to use and more distinctive."
+      })
+    );
+  }
+
+  if (!hasCitations) {
+    actions.push(
+      createAction({
+        impact: 5,
+        ease: 5,
+        action: "Add citations, references, or useful supporting resources.",
+        whyItMatters:
+          "Citations and resources strengthen editorial trust and give readers paths to verify or explore claims."
+      })
+    );
+  }
+
+  actions.push(
+    createAction({
+      impact: 4,
+      ease: 5,
+      action: "Improve media richness with helpful images, screenshots, diagrams, video, or summary tables.",
+      whyItMatters:
+        "Media-rich articles are easier to scan, understand, and reuse."
+    })
+  );
+
+  return actions
+    .filter(
+      (action, index, allActions) =>
+        allActions.findIndex((item) => item.action === action.action) === index
+    )
+    .sort((a, b) => b.estimatedScoreGain - a.estimatedScoreGain);
+}
+
 export function createPrioritizedActions(
   input: ScoringInput,
   signals: ExtractedSignals
 ): PrioritizedAction[] {
   const actions: PrioritizedAction[] = [];
   const intentMode = getIntentMode(input);
+
+  if (intentMode === "blog-media") {
+    return createBlogMediaPrioritizedActions(input, signals);
+  }
+
   const pageText = `${input.text ?? ""}\n${input.html ?? ""}`;
   const schemaSource = input.schemaJson ?? "";
   const hasFaqContent = includesAny(pageText, [
