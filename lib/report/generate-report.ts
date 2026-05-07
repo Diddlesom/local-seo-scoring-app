@@ -118,6 +118,32 @@ function getIntentModeNotice(mode?: IntentMode): string {
     : "";
 }
 
+function getReportNotices(
+  result: ScoreResult,
+  mode?: IntentMode
+): string[] {
+  const notices: string[] = [];
+
+  if (
+    mode === "blog-media" &&
+    !result.signals.schemaTypes.some((type) =>
+      ["Article", "BlogPosting", "HowTo"].includes(type)
+    )
+  ) {
+    notices.push(
+      "Sitewide schema may be present, but Blog/Media pages should use Article, BlogPosting, or HowTo schema where appropriate."
+    );
+  }
+
+  if (mode === "saas" && result.signals.jsRenderingWarning) {
+    notices.push(
+      "Content may be incomplete due to JavaScript rendering limitations. Scores may be understated."
+    );
+  }
+
+  return notices;
+}
+
 function decodeHtmlEntities(text: string): string {
   return text
     .replace(/&amp;/g, "&")
@@ -1272,6 +1298,24 @@ function getTaskDetails(
   }
 
   if (
+    page.intentMode === "blog-media" &&
+    (cleanAction.includes("article, blogposting") ||
+      cleanAction.includes("howto schema") ||
+      cleanAction.includes("blogposting"))
+  ) {
+    return {
+      whereToImplement:
+        "SEO plugin schema settings, page template, article schema block, or JSON-LD injection area.",
+      whatToChange:
+        "Add article-specific structured data that matches the visible content. Use BlogPosting or Article for standard informational articles. Use HowTo only if the page contains clear step-by-step instructions.",
+      example:
+        "Do not rely only on sitewide business schema. Add Article, BlogPosting, or HowTo schema that matches the article content.",
+      expectedOutcome:
+        "The page has schema that matches informational search intent rather than relying only on sitewide business schema."
+    };
+  }
+
+  if (
     page.intentMode === "affiliate" &&
     (cleanAction.includes("product, review") ||
       cleanAction.includes("itemlist") ||
@@ -1741,6 +1785,9 @@ export function generateDeveloperReport({
     `- Page title: ${page.title ? cleanReportText(page.title) : "Not provided"}`,
     `- Meta description: ${page.metaDescription ? cleanReportText(page.metaDescription) : "Not provided"}`,
     `- Score / grade: ${result.totalScore}/100 (${result.grade})`,
+    ...getReportNotices(result, page.intentMode).map(
+      (notice) => `- Notice: ${notice}`
+    ),
     "",
     "DO NOT CHANGE",
     listItems(getDoNotChangeItems(result, page.intentMode)),

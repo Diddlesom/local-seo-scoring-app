@@ -111,7 +111,15 @@ function getIntentMode(input: ScoringInput): IntentMode {
 function createBlogMediaCategoryScores(
   signals: ReturnType<typeof extractSignals>
 ): CategoryScores {
-  const blogMediaSchemaTypes = getRelevantSchemaTypes(signals, "blog-media");
+  const primaryArticleSchemaTypes = signals.schemaTypes.filter((type) =>
+    ["Article", "BlogPosting", "HowTo"].includes(type)
+  );
+  const supportingSchemaTypes = getRelevantSchemaTypes(signals, "blog-media").filter(
+    (type) => !["Article", "BlogPosting", "HowTo"].includes(type)
+  );
+  const schemaScore =
+    Math.min(primaryArticleSchemaTypes.length * 10, 10) +
+    Math.min(supportingSchemaTypes.length * 3, 5);
 
   return {
     content: signals.wordCount >= 900 ? 15 : signals.wordCount >= 500 ? 10 : 5,
@@ -128,7 +136,7 @@ function createBlogMediaCategoryScores(
     localSignals: Math.min(signals.topicSignals.length * 4, 15),
     trust: Math.min(signals.trustSignals.length * 2, 10),
     conversion: Math.min(signals.ctaWords.length * 3, 10),
-    schema: Math.min(blogMediaSchemaTypes.length * 5, 15)
+    schema: schemaScore
   };
 }
 
@@ -306,8 +314,6 @@ function createWeaknesses(
 
   if (categoryScores.content < 10 && !signals.jsRenderingWarning) {
     weaknesses.push("Page content is thin.");
-  } else if (signals.jsRenderingWarning) {
-    weaknesses.push("Content may be incomplete due to JavaScript rendering limitations.");
   }
 
   if (signals.headings.h1.length === 0) {

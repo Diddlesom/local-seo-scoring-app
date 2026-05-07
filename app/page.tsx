@@ -2698,6 +2698,13 @@ export default function Home() {
             </div>
           </div>
 
+          {form.intentMode === "saas" && result.signals.jsRenderingWarning ? (
+            <p className="warning-output">
+              Content may be incomplete due to JavaScript rendering limitations.
+              Scores may be understated.
+            </p>
+          ) : null}
+
           <TopIssues intentMode={form.intentMode} result={result} />
 
           <section className="panel card">

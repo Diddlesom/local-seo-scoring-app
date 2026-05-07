@@ -664,10 +664,8 @@ function createBlogMediaPrioritizedActions(
   const hasMedia = /<img\b|<picture\b|<video\b|\b(?:diagram|screenshot|screenshots|image|images|chart|table)\b/i.test(
     pageText
   );
-  const hasEditorialSchema = signals.schemaTypes.some((type) =>
-    ["Article", "BlogPosting", "FAQPage", "HowTo", "BreadcrumbList", "Organization"].includes(
-      type
-    )
+  const hasPrimaryArticleSchema = signals.schemaTypes.some((type) =>
+    ["Article", "BlogPosting", "HowTo"].includes(type)
   );
 
   if (!signals.titleKeywordMatch) {
@@ -742,7 +740,7 @@ function createBlogMediaPrioritizedActions(
     );
   }
 
-  if (!hasTableOfContents) {
+  if (!hasTableOfContents && signals.wordCount >= 900) {
     actions.push(
       createAction({
         impact: 4,
@@ -750,6 +748,21 @@ function createBlogMediaPrioritizedActions(
         action: "Add a table of contents or jump links for longer informational articles.",
         whyItMatters:
           "A table of contents helps readers scan the article and reach the section they need faster."
+      })
+    );
+  }
+
+  if (
+    hasFaqCoverage &&
+    !signals.topicSignals.includes("PAA-style question coverage")
+  ) {
+    actions.push(
+      createAction({
+        impact: 5,
+        ease: 6,
+        action: "Add PAA-style question sections that answer follow-up reader questions.",
+        whyItMatters:
+          "Question-led sections help informational articles cover related search intent more completely."
       })
     );
   }
@@ -793,14 +806,14 @@ function createBlogMediaPrioritizedActions(
         ])
   );
 
-  if (!hasEditorialSchema) {
+  if (!hasPrimaryArticleSchema) {
     actions.push(
       createAction({
         impact: 5,
         ease: 5,
-        action: "Add Article, BlogPosting, HowTo, BreadcrumbList, or FAQPage schema where appropriate.",
+        action: "Add Article, BlogPosting, or HowTo schema where appropriate.",
         whyItMatters:
-          "Intent-specific editorial schema clarifies article structure without relying on local business markup."
+          "Article-specific schema clarifies informational content without relying on sitewide business schema."
       })
     );
   }

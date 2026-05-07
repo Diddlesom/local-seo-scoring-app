@@ -683,7 +683,7 @@ function findSchemaTypes(schemaSource: string): string[] {
 }
 
 function appearsJsRendered(html: string, wordCount: number): boolean {
-  if (wordCount >= 250 || html.length < 1500) {
+  if (wordCount >= 900) {
     return false;
   }
 
@@ -691,10 +691,11 @@ function appearsJsRendered(html: string, wordCount: number): boolean {
   const appShellSignals =
     /__NEXT_DATA__|data-reactroot|id=["'](?:root|__next|app)["']|<noscript\b/i.test(
       html
-    );
+  );
   const bodyText = stripHtml(html);
+  const sparseContent = wordCount < 900;
 
-  return scriptCount >= 5 || (appShellSignals && countWords(bodyText) < 250);
+  return sparseContent || scriptCount >= 5 || (appShellSignals && countWords(bodyText) < 250);
 }
 
 export function extractSignals(input: ScoringInput): ExtractedSignals {
@@ -781,7 +782,9 @@ export function extractSignals(input: ScoringInput): ExtractedSignals {
         ]
       : []),
     ...(jsRenderingWarning
-      ? ["Content may be incomplete due to JavaScript rendering limitations."]
+      ? [
+          "Content may be incomplete due to JavaScript rendering limitations. Scores may be understated."
+        ]
       : [])
   ];
 

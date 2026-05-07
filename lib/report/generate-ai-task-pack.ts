@@ -62,6 +62,32 @@ function getIntentModeNotice(mode?: IntentMode): string {
     : "";
 }
 
+function getTaskPackNotices(
+  result: ScoreResult,
+  mode?: IntentMode
+): string[] {
+  const notices: string[] = [];
+
+  if (
+    mode === "blog-media" &&
+    !result.signals.schemaTypes.some((type) =>
+      ["Article", "BlogPosting", "HowTo"].includes(type)
+    )
+  ) {
+    notices.push(
+      "Sitewide schema may be present, but Blog/Media pages should use Article, BlogPosting, or HowTo schema where appropriate."
+    );
+  }
+
+  if (mode === "saas" && result.signals.jsRenderingWarning) {
+    notices.push(
+      "Content may be incomplete due to JavaScript rendering limitations. Scores may be understated."
+    );
+  }
+
+  return notices;
+}
+
 export type ExecutionMode = "fast" | "balanced" | "thorough";
 
 type ExecutionModeConfig = {
@@ -855,6 +881,15 @@ function getFaqJsonLd(page: ReportPageDetails): string {
 function getWhereToImplement(action: PrioritizedAction, page: ReportPageDetails): string {
   const cleanAction = action.action.toLowerCase();
 
+  if (
+    page.intentMode === "blog-media" &&
+    (cleanAction.includes("article, blogposting") ||
+      cleanAction.includes("howto schema") ||
+      cleanAction.includes("blogposting"))
+  ) {
+    return "SEO plugin schema settings, page template, article schema block, or JSON-LD injection area.";
+  }
+
   if (cleanAction.includes("faqpage schema")) {
     return "WordPress SEO plugin custom schema field, page head, or page-level JSON-LD injection area.";
   }
@@ -891,6 +926,22 @@ function getWhereToImplement(action: PrioritizedAction, page: ReportPageDetails)
 function getCodeOrContent(action: PrioritizedAction, page: ReportPageDetails): string {
   const cleanAction = action.action.toLowerCase();
   const targetKeyword = page.keyword ? cleanText(page.keyword) : "Cordless Vacuum Cleaners";
+
+  if (
+    page.intentMode === "blog-media" &&
+    (cleanAction.includes("article, blogposting") ||
+      cleanAction.includes("howto schema") ||
+      cleanAction.includes("blogposting"))
+  ) {
+    return [
+      "Add article-specific structured data that matches the visible content.",
+      "- Use BlogPosting or Article for standard informational articles.",
+      "- Use HowTo only if the page contains clear step-by-step instructions.",
+      "- Do not rely only on sitewide business schema.",
+      "",
+      "Expected outcome: The page has schema that matches informational search intent rather than relying only on sitewide business schema."
+    ].join("\n");
+  }
 
   if (
     page.intentMode === "affiliate" &&
@@ -1554,6 +1605,9 @@ function generateFastInternalLinkTaskPack({
     "",
     `Intent mode: ${getIntentModeLabel(page.intentMode)}`,
     ...formatOptionalLine("Mode notice", getIntentModeNotice(page.intentMode)),
+    ...getTaskPackNotices(result, page.intentMode).map(
+      (notice) => `Notice: ${notice}`
+    ),
     `Target page: ${page.url || "Not provided"}`,
     "",
     "Add this one internal link once.",
@@ -1686,6 +1740,9 @@ export function generateAiTaskPack({
     ...(getIntentModeNotice(page.intentMode)
       ? [`- Mode notice: ${getIntentModeNotice(page.intentMode)}`]
       : []),
+    ...getTaskPackNotices(result, page.intentMode).map(
+      (notice) => `- Notice: ${notice}`
+    ),
     `- Target keyword: ${page.keyword ? cleanText(page.keyword) : "Not provided"}`,
     `- Location: ${page.location ? cleanText(page.location) : "Not provided"}`,
     `- URL: ${page.url || "Not provided"}`,
