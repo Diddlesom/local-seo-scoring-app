@@ -145,7 +145,12 @@ nav a:hover {
   font-size: 18px;
   line-height: 1.6;
   margin: 0;
-  max-width: 720px;
+  max-width: 860px;
+}
+
+.hero-lead {
+  color: #183c2a;
+  font-weight: 800;
 }
 
 .credibility-line {
@@ -167,6 +172,31 @@ nav a:hover {
   letter-spacing: 0.04em;
   padding: 8px 12px;
   text-transform: uppercase;
+}
+
+.how-to-use {
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(198, 216, 201, 0.9);
+  border-radius: 20px;
+  box-shadow: 0 18px 50px rgba(7, 45, 30, 0.06);
+  max-width: 860px;
+  padding: 20px;
+}
+
+.how-to-use h2 {
+  font-size: 18px;
+  margin: 0 0 12px;
+}
+
+.how-to-use ol {
+  color: #526359;
+  line-height: 1.7;
+  margin: 0;
+  padding-left: 22px;
+}
+
+.how-to-use li {
+  padding-left: 4px;
 }
 
 .hero-divider {

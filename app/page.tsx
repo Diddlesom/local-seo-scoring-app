@@ -2208,18 +2208,18 @@ export default function Home() {
         <div className="brand">
           <div className="logo-mark">
             {logoFailed ? (
-              <span>Local SEO</span>
+              <span>SEO</span>
             ) : (
               <img
-                alt="Local SEO Scoring App logo"
+                alt="Intent-Aware SEO Analyzer logo"
                 onError={() => setLogoFailed(true)}
                 src={logoUrl}
               />
             )}
           </div>
           <div>
-            <strong>Local SEO Scoring App</strong>
-            <span>Page scoring, schema checks, and AI-ready SEO tasks.</span>
+            <strong>Intent-Aware SEO Analyzer</strong>
+            <span>Analyze pages by search intent using mode-aware SEO scoring.</span>
           </div>
         </div>
         <nav aria-label="Dashboard navigation">
@@ -2233,19 +2233,32 @@ export default function Home() {
 
       <section className="hero">
         <div>
-          <span className="product-badge">CWC Local SEO Toolkit</span>
-          <h1>
-            {formTitles[form.intentMode]} and turn gaps into clear,
-            actionable SEO tasks.
-          </h1>
+          <span className="product-badge">Intent-aware SEO toolkit</span>
+          <h1>Intent-Aware SEO Analyzer</h1>
+          <p className="hero-lead">
+            Analyze pages by search intent using mode-aware SEO scoring.
+          </p>
           <p>
-            Fetch a page, analyse real content, and export tasks your developer
-            or AI can execute.
+            Choose a mode, enter a target keyword and URL, then compare your
+            page against real competitors to uncover content gaps, schema
+            issues, trust-signal weaknesses, internal-link opportunities, and
+            ranking patterns.
           </p>
           <p className="credibility-line">
-            Built for practical content checks, schema review, and real-world
-            ranking improvements.
+            Supports Local SEO, Blog / Media, Affiliate, and SaaS analysis.
           </p>
+        </div>
+
+        <div className="how-to-use">
+          <h2>How to use</h2>
+          <ol>
+            <li>Choose the closest search intent mode.</li>
+            <li>Enter your target keyword.</li>
+            <li>Paste the page URL you want to analyze.</li>
+            <li>Add competitor URLs if you want benchmark comparisons.</li>
+            <li>Run the analysis.</li>
+            <li>Export the developer task sheet, branded PDF, or AI task pack.</li>
+          </ol>
         </div>
       </section>
 
@@ -2268,7 +2281,7 @@ export default function Home() {
 
         <div className="form-grid">
           <label>
-            Intent mode
+            Search Intent Mode
             <select
               name="intentMode"
               onChange={(event) =>
