@@ -820,7 +820,14 @@ function getAssistantInstructions(mode?: IntentMode): string[] {
     "- Keep recommendations practical for WordPress."
   ];
 
-  if (mode === "saas") {
+  if (mode === "blog-media") {
+    instructions.push(
+      "",
+      "CONTENT ACCURACY RULE",
+      "- Do not invent author credentials, sources, examples, test results, dates, or statistics.",
+      "- Only include claims that are visible on the page or confirmed by the site owner."
+    );
+  } else if (mode === "saas") {
     instructions.push(
       "",
       "CASE STUDY / TESTIMONIAL RULE",
@@ -1213,6 +1220,7 @@ function getDoNotChangeItems(
   if (
     !isAffiliate &&
     !isSaas &&
+    !isBlogMedia &&
     (result.signals.hasPhoneNumber || result.signals.ctaWords.length > 0)
   ) {
     items.push(
@@ -1226,6 +1234,8 @@ function getDoNotChangeItems(
         ? `Existing affiliate trust signals are useful: ${result.signals.trustSignals.join(", ")}.`
         : isSaas
           ? `Existing SaaS trust signals are useful: ${result.signals.trustSignals.join(", ")}.`
+          : isBlogMedia
+            ? `Existing editorial trust signals are useful: ${result.signals.trustSignals.join(", ")}.`
         : `Existing review/trust content is useful: ${result.signals.trustSignals.join(", ")}.`
     );
   }
@@ -1724,6 +1734,18 @@ function formatTasks(
 }
 
 function getDeveloperQaChecklist(mode?: IntentMode): string[] {
+  if (mode === "blog-media") {
+    return [
+      "- Run Google Rich Results Test",
+      "- Validate Article/BlogPosting/HowTo/FAQPage JSON-LD",
+      "- Check page still has one H1",
+      "- Check table of contents links work",
+      "- Check images/screenshots load on mobile",
+      "- Check related article links work",
+      "- Check FAQPage schema only matches visible FAQs"
+    ];
+  }
+
   if (mode === "affiliate") {
     return [
       "- Run Google Rich Results Test",
