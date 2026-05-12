@@ -17,6 +17,7 @@ type FetchedPageData = {
   title: string;
   metaDescription: string;
   html: string;
+  rawHtml: string;
   cleanText: string;
   bodyText: string;
   headings: {
@@ -59,6 +60,7 @@ type FormState = {
   metaDescription: string;
   websiteUrl: string;
   pageContent: string;
+  rawHtml: string;
   headings: {
     h1: string[];
     h2: string[];
@@ -106,6 +108,7 @@ const initialFormState: FormState = {
   metaDescription: "",
   websiteUrl: "",
   pageContent: "",
+  rawHtml: "",
   headings: {
     h1: [],
     h2: [],
@@ -143,6 +146,7 @@ const exampleFormState: FormState = {
   metaDescription: "",
   websiteUrl: "https://www.londonsmileclinic.co.uk/",
   pageContent: "",
+  rawHtml: "",
   headings: {
     h1: [],
     h2: [],
@@ -1895,6 +1899,7 @@ export default function Home() {
         title: pageData.title,
         metaDescription: pageData.metaDescription,
         pageContent: pageData.cleanText || pageData.bodyText || pageData.html,
+        rawHtml: pageData.rawHtml || pageData.html,
         headings: pageData.headings,
         schemaJson: pageData.schemaJson,
         reportData: {
@@ -1937,7 +1942,7 @@ export default function Home() {
           title: form.title,
           metaDescription: form.metaDescription,
           websiteUrl: form.websiteUrl,
-          html: form.pageContent,
+          html: form.rawHtml || form.pageContent,
           text: form.pageContent,
           headings: form.headings,
           schemaJson: form.schemaJson,
@@ -2028,7 +2033,7 @@ export default function Home() {
         title: pageData.title,
         metaDescription: pageData.metaDescription,
         websiteUrl: input.url,
-        html: pageText,
+        html: pageData.rawHtml || pageData.html || pageText,
         text: pageText,
         headings: pageData.headings,
         schemaJson: pageData.schemaJson

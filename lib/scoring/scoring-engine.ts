@@ -369,6 +369,10 @@ function createWeaknesses(
       );
     }
 
+    if (!signals.affiliateChecks?.visibleAffiliateDisclosurePresent) {
+      weaknesses.push("No visible affiliate disclosure was found.");
+    }
+
     if (signals.ctaWords.length === 0) {
       weaknesses.push("No clear reader next-step wording was found.");
     }
@@ -379,7 +383,7 @@ function createWeaknesses(
       weaknesses.push(
         hasLocalBusinessSchemaOnly(signals, intentMode)
           ? "Detected schema appears primarily local-business focused rather than intent-specific."
-          : "No Affiliate-supported schema markup was found."
+          : "No Product, Review, or ItemList schema markup was found."
       );
     }
 

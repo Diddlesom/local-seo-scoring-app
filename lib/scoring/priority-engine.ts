@@ -90,7 +90,10 @@ export function createPriorityActions(
       });
     }
 
-    if (!signals.trustSignals.includes("Affiliate disclosure")) {
+    if (
+      !signals.affiliateChecks?.visibleAffiliateDisclosurePresent &&
+      !signals.trustSignals.includes("Affiliate disclosure")
+    ) {
       actions.push({
         id: "add-affiliate-disclosure",
         title: "Add a clear affiliate disclosure",
@@ -846,8 +849,9 @@ function createAffiliatePrioritizedActions(
   const hasBuyerGuide = signals.topicSignals.includes("Buyer guide sections");
   const hasPricing = signals.topicSignals.includes("Pricing/value language");
   const hasAffiliateDisclosure =
+    signals.affiliateChecks?.visibleAffiliateDisclosurePresent ||
     signals.trustSignals.includes("Affiliate disclosure") ||
-    /\b(?:affiliate disclosure|affiliate links?|commission|we may earn|reader-supported)\b/i.test(
+    /\b(?:affiliate disclosure|affiliate links?|as an amazon associate|earns from qualifying purchases|commission at no extra cost|we may earn (?:a )?commission|sponsored links?|paid links?|reader-supported)\b/i.test(
       pageText
     );
   const hasExpertise = signals.trustSignals.includes("Author/reviewer expertise");

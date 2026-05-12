@@ -439,11 +439,7 @@ function findAffiliateTrustSignals(
   const signals = new Set<string>();
   const allContent = `${text} ${headings.h1.join(" ")} ${headings.h2.join(" ")} ${headings.h3.join(" ")}`;
 
-  if (
-    /\b(?:affiliate disclosure|affiliate links?|commission|we may earn|reader-supported|paid link|sponsored)\b/i.test(
-      allContent
-    )
-  ) {
+  if (hasVisibleAffiliateDisclosure(allContent)) {
     signals.add("Affiliate disclosure");
   }
 
@@ -494,6 +490,45 @@ function findAffiliateTrustSignals(
   }
 
   return Array.from(signals);
+}
+
+function hasVisibleAffiliateDisclosure(text: string): boolean {
+  return /\b(?:affiliate disclosure|affiliate links?|as an amazon associate|earns from qualifying purchases|commission at no extra cost|we may earn (?:a )?commission|sponsored links?|paid links?|reader-supported)\b/i.test(
+    text
+  );
+}
+
+function hasAmazonAssociateWording(text: string): boolean {
+  return /\bas an amazon associate\b|\bearn(?:s)? from qualifying purchases\b/i.test(
+    text
+  );
+}
+
+function hasAffiliateLinks(html: string): boolean {
+  return /<a\b[^>]+href=["'][^"']*(?:amazon\.[^/"']+|amzn\.to|tag=|aff(?:iliate)?|ref=|utm_(?:source|medium)=affiliate)[^"']*["']/i.test(
+    html
+  );
+}
+
+function createAffiliateChecks({
+  html,
+  schemaTypes,
+  text
+}: {
+  html: string;
+  schemaTypes: string[];
+  text: string;
+}): NonNullable<ExtractedSignals["affiliateChecks"]> {
+  const visibleText = `${stripHtml(html)} ${text}`;
+
+  return {
+    visibleAffiliateDisclosurePresent: hasVisibleAffiliateDisclosure(visibleText),
+    affiliateLinksPresent: hasAffiliateLinks(html),
+    productReviewComparisonSchemaPresent: schemaTypes.some((type) =>
+      ["Product", "Review", "ItemList"].includes(type)
+    ),
+    amazonAssociateWordingPresent: hasAmazonAssociateWording(visibleText)
+  };
 }
 
 function findAffiliateTopicSignals(
@@ -724,6 +759,14 @@ export function extractSignals(input: ScoringInput): ExtractedSignals {
         : [];
   const ctaWords = findMatches(pageText, ctaWordsByIntentMode[intentMode]);
   const schemaTypes = findSchemaTypes(schemaSource);
+  const affiliateChecks =
+    intentMode === "affiliate"
+      ? createAffiliateChecks({
+          html,
+          schemaTypes,
+          text: `${pageText}\n${html}`
+        })
+      : undefined;
   const locationMentionCount = countPhrase(pageText, input.location);
   const hasPhoneNumber = findPhoneNumber(pageText);
   const titleKeywordMatch =
@@ -766,6 +809,14 @@ export function extractSignals(input: ScoringInput): ExtractedSignals {
                 : "No Blog/Media topic signals detected"
         ]
       : []),
+    ...(affiliateChecks
+      ? [
+          `Visible affiliate disclosure present: ${affiliateChecks.visibleAffiliateDisclosurePresent ? "true" : "false"}`,
+          `Affiliate links present: ${affiliateChecks.affiliateLinksPresent ? "true" : "false"}`,
+          `Product/review/comparison schema present: ${affiliateChecks.productReviewComparisonSchemaPresent ? "true" : "false"}`,
+          `Amazon Associate wording present: ${affiliateChecks.amazonAssociateWordingPresent ? "true" : "false"}`
+        ]
+      : []),
     ctaWords.length > 0
       ? `CTA words: ${ctaWords.join(", ")}`
       : "No CTA words detected",
@@ -801,7 +852,8 @@ export function extractSignals(input: ScoringInput): ExtractedSignals {
     ctaWords,
     schemaTypes,
     evidence,
-    jsRenderingWarning
+    jsRenderingWarning,
+    affiliateChecks
   };
 }
 

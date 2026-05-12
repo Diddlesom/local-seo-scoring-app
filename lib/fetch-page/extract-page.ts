@@ -484,14 +484,16 @@ function normalizeUrlForComparison(url: URL): string {
 }
 
 export function extractPageData(url: string, html: string): FetchedPageData {
+  const rawBodyHtml = getBodyHtml(html);
   const contentHtml = pickContentHtml(html);
   const cleanTextContent = extractCleanText(contentHtml);
+  const rawBodyTextContent = extractCleanText(removeHiddenContent(rawBodyHtml));
   const schemaScripts = extractJsonLd(html);
   const faqItems = extractFaqItems(contentHtml);
   const headings = {
-    h1: extractHeadings(contentHtml, "h1"),
-    h2: extractHeadings(contentHtml, "h2"),
-    h3: extractHeadings(contentHtml, "h3")
+    h1: extractHeadings(rawBodyHtml, "h1"),
+    h2: extractHeadings(rawBodyHtml, "h2"),
+    h3: extractHeadings(rawBodyHtml, "h3")
   };
 
   return {
@@ -499,8 +501,9 @@ export function extractPageData(url: string, html: string): FetchedPageData {
     title: getTagContent(html, "title"),
     metaDescription: getMetaDescription(html),
     html: contentHtml,
+    rawHtml: rawBodyHtml,
     cleanText: cleanTextContent,
-    bodyText: cleanTextContent,
+    bodyText: rawBodyTextContent,
     headings,
     schemaJson: schemaScripts.join("\n\n"),
     phoneNumbers: extractPhoneNumbers(cleanTextContent),

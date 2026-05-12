@@ -40,6 +40,12 @@ export type ExtractedSignals = {
   schemaTypes: string[];
   evidence: string[];
   jsRenderingWarning?: boolean;
+  affiliateChecks?: {
+    visibleAffiliateDisclosurePresent: boolean;
+    affiliateLinksPresent: boolean;
+    productReviewComparisonSchemaPresent: boolean;
+    amazonAssociateWordingPresent: boolean;
+  };
 };
 
 export type PriorityAction = {
