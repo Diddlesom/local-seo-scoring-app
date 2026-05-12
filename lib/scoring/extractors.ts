@@ -510,16 +510,34 @@ function hasAffiliateLinks(html: string): boolean {
   );
 }
 
+function productSchemaHasSnippetFields(schemaSource: string): boolean {
+  return /"@type"\s*:\s*"[^"]*Product[^"]*"/i.test(schemaSource) &&
+    /"(?:offers|review|aggregateRating)"\s*:/i.test(schemaSource);
+}
+
+function productSchemaHasName(schemaSource: string): boolean {
+  return /"@type"\s*:\s*"[^"]*Product[^"]*"[\s\S]*?"name"\s*:\s*"[^"]+"/i.test(
+    schemaSource
+  );
+}
+
 function createAffiliateChecks({
   html,
+  schemaSource,
   schemaTypes,
   text
 }: {
   html: string;
+  schemaSource: string;
   schemaTypes: string[];
   text: string;
 }): NonNullable<ExtractedSignals["affiliateChecks"]> {
   const visibleText = `${stripHtml(html)} ${text}`;
+  const productSchemaDetected = schemaTypes.includes("Product");
+  const productSchemaEligibleForSnippets =
+    productSchemaDetected &&
+    productSchemaHasName(schemaSource) &&
+    productSchemaHasSnippetFields(schemaSource);
 
   return {
     visibleAffiliateDisclosurePresent: hasVisibleAffiliateDisclosure(visibleText),
@@ -527,7 +545,15 @@ function createAffiliateChecks({
     productReviewComparisonSchemaPresent: schemaTypes.some((type) =>
       ["Product", "Review", "ItemList"].includes(type)
     ),
-    amazonAssociateWordingPresent: hasAmazonAssociateWording(visibleText)
+    amazonAssociateWordingPresent: hasAmazonAssociateWording(visibleText),
+    productSchemaDetected,
+    productSchemaEligibleForSnippets,
+    productSchemaMayBeIneligible:
+      productSchemaDetected && !productSchemaEligibleForSnippets,
+    cleanComparisonSchemaPresent:
+      schemaTypes.includes("ItemList") &&
+      schemaTypes.includes("FAQPage") &&
+      !productSchemaDetected
   };
 }
 
@@ -763,6 +789,7 @@ export function extractSignals(input: ScoringInput): ExtractedSignals {
     intentMode === "affiliate"
       ? createAffiliateChecks({
           html,
+          schemaSource,
           schemaTypes,
           text: `${pageText}\n${html}`
         })
@@ -814,7 +841,13 @@ export function extractSignals(input: ScoringInput): ExtractedSignals {
           `Visible affiliate disclosure present: ${affiliateChecks.visibleAffiliateDisclosurePresent ? "true" : "false"}`,
           `Affiliate links present: ${affiliateChecks.affiliateLinksPresent ? "true" : "false"}`,
           `Product/review/comparison schema present: ${affiliateChecks.productReviewComparisonSchemaPresent ? "true" : "false"}`,
-          `Amazon Associate wording present: ${affiliateChecks.amazonAssociateWordingPresent ? "true" : "false"}`
+          `Amazon Associate wording present: ${affiliateChecks.amazonAssociateWordingPresent ? "true" : "false"}`,
+          `Clean comparison schema present: ${affiliateChecks.cleanComparisonSchemaPresent ? "true" : "false"}`,
+          ...(affiliateChecks.productSchemaMayBeIneligible
+            ? [
+                "Product schema detected, but it may not be eligible for Google Product snippets unless valid offers, review, or aggregateRating data is present. Do not add fake values."
+              ]
+            : [])
         ]
       : []),
     ctaWords.length > 0

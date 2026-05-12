@@ -868,6 +868,11 @@ function createAffiliatePrioritizedActions(
   const hasReviewSchema = schemaTypes.has("Review");
   const hasItemListSchema = schemaTypes.has("ItemList");
   const hasFaqSchema = schemaTypes.has("FAQPage");
+  const hasCleanComparisonSchema =
+    signals.affiliateChecks?.cleanComparisonSchemaPresent ||
+    (hasItemListSchema && hasFaqSchema && !hasProductSchema);
+  const hasIneligibleProductSchema =
+    signals.affiliateChecks?.productSchemaMayBeIneligible ?? false;
 
   if (!signals.titleKeywordMatch) {
     actions.push(
@@ -1008,9 +1013,31 @@ function createAffiliatePrioritizedActions(
         impact: 6,
         ease: 5,
         action:
-          "Add Product, Review, or ItemList schema where appropriate. Only add FAQPage schema if visible FAQs are added first.",
+          "Add ItemList schema for comparison content, or Product/Review schema only where valid visible offer, rating, or review data exists. Only add FAQPage schema if visible FAQs are added first.",
         whyItMatters:
-          "Affiliate-friendly schema helps clarify products, reviews, lists, and FAQs without using local business markup."
+          "Affiliate-friendly schema should clarify products, lists, and FAQs without creating invalid Product snippets."
+      })
+    );
+  } else if (hasIneligibleProductSchema) {
+    actions.push(
+      createAction({
+        impact: 3,
+        ease: 5,
+        action:
+          "Review Product schema eligibility before using Product snippets.",
+        whyItMatters:
+          "Product schema detected, but it may not be eligible for Google Product snippets unless valid offers, review, or aggregateRating data is present. Do not add fake values."
+      })
+    );
+  } else if (hasCleanComparisonSchema) {
+    actions.push(
+      createAction({
+        impact: 2,
+        ease: 5,
+        action:
+          "Schema appears suitable for a comparison article. Product or Review schema should only be added if the page contains visible, valid offer, rating, or review data.",
+        whyItMatters:
+          "Clean ItemList and FAQPage schema can be safer for comparison articles than invalid nested Product snippets."
       })
     );
   } else if (countSchemaTypes(schemaSource) > 1) {
@@ -1019,9 +1046,9 @@ function createAffiliatePrioritizedActions(
         impact: 3,
         ease: 5,
         action:
-          "Review affiliate schema blocks for consistency across Product, Review, ItemList, and FAQPage markup.",
+          "Review affiliate schema blocks for eligibility and consistency.",
         whyItMatters:
-          "Consistent affiliate schema reduces conflicting product or review data."
+          "Product or Review schema should only be added when visible, valid offer, rating, or review data supports it."
       })
     );
   }

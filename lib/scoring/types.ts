@@ -45,6 +45,10 @@ export type ExtractedSignals = {
     affiliateLinksPresent: boolean;
     productReviewComparisonSchemaPresent: boolean;
     amazonAssociateWordingPresent: boolean;
+    productSchemaDetected: boolean;
+    productSchemaEligibleForSnippets: boolean;
+    productSchemaMayBeIneligible: boolean;
+    cleanComparisonSchemaPresent: boolean;
   };
 };
 

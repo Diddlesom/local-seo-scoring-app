@@ -144,6 +144,25 @@ function createAffiliateCategoryScores(
   signals: ReturnType<typeof extractSignals>
 ): CategoryScores {
   const affiliateSchemaTypes = getRelevantSchemaTypes(signals, "affiliate");
+  const hasItemListSchema = affiliateSchemaTypes.includes("ItemList");
+  const hasFaqSchema = affiliateSchemaTypes.includes("FAQPage");
+  const hasReviewSchema = affiliateSchemaTypes.includes("Review");
+  const hasArticleOrBreadcrumbSchema =
+    affiliateSchemaTypes.includes("Article") ||
+    affiliateSchemaTypes.includes("BreadcrumbList");
+  const hasEligibleProductSchema =
+    signals.affiliateChecks?.productSchemaEligibleForSnippets ?? false;
+  const schemaScore =
+    hasItemListSchema && hasFaqSchema && !signals.affiliateChecks?.productSchemaDetected
+      ? 15
+      : Math.min(
+          (hasItemListSchema ? 8 : 0) +
+            (hasFaqSchema ? 5 : 0) +
+            (hasReviewSchema ? 5 : 0) +
+            (hasEligibleProductSchema ? 5 : 0) +
+            (hasArticleOrBreadcrumbSchema ? 2 : 0),
+          15
+        );
 
   return {
     content: signals.wordCount >= 1000 ? 15 : signals.wordCount >= 600 ? 10 : 5,
@@ -160,7 +179,7 @@ function createAffiliateCategoryScores(
     localSignals: Math.min(signals.topicSignals.length * 3, 15),
     trust: Math.min(signals.trustSignals.length * 2, 10),
     conversion: Math.min(signals.ctaWords.length * 3, 10),
-    schema: Math.min(affiliateSchemaTypes.length * 5, 15)
+    schema: schemaScore
   };
 }
 
@@ -384,6 +403,12 @@ function createWeaknesses(
         hasLocalBusinessSchemaOnly(signals, intentMode)
           ? "Detected schema appears primarily local-business focused rather than intent-specific."
           : "No Product, Review, or ItemList schema markup was found."
+      );
+    }
+
+    if (signals.affiliateChecks?.productSchemaMayBeIneligible) {
+      weaknesses.push(
+        "Product schema detected, but it may not be eligible for Google Product snippets unless valid offers, review, or aggregateRating data is present. Do not add fake values."
       );
     }
 
